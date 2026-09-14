@@ -5,7 +5,7 @@ plugins {
     application
 }
 
-group = "dev.kotycli"
+group = "com.softbenur.kotycli"
 version = "0.1.0-SNAPSHOT"
 
 kotlin {
@@ -35,7 +35,7 @@ dependencies {
 }
 
 application {
-    mainClass = "dev.kotycli.MainKt"
+    mainClass = "com.softbenur.kotycli.MainKt"
     applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstdin.encoding=UTF-8")
 }
 
@@ -45,7 +45,7 @@ tasks.shadowJar {
     archiveVersion = ""
     mergeServiceFiles()
     manifest {
-        attributes("Main-Class" to "dev.kotycli.MainKt")
+        attributes("Main-Class" to "com.softbenur.kotycli.MainKt")
     }
 }
 

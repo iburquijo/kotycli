@@ -11,7 +11,7 @@ Agente de código de terminal en Kotlin/JVM. La arquitectura está en `docs/arch
 
 ## Reglas del código
 
-- Un solo módulo, paquetes en `src/main/kotlin/dev/kotycli/` con el layout del doc `07-build-y-distribucion.md`.
+- Un solo módulo, paquetes en `src/main/kotlin/com/softbenur/kotycli/` con el layout del doc `07-build-y-distribucion.md`.
 - El core (`core/`) no imprime ni conoce proveedores ni frontends. `ArchitectureTest` lo vigila: `println` solo en `frontend/` y `Main.kt`; los tipos de `providers/openai` solo dentro de `providers/`.
 - Historial append-only. Las tools devuelven `isError = true`, nunca lanzan fuera de `execute`.
 - Permisos, logging, guardas de path y truncado son interceptores, no lógica en las tools.

@@ -28,7 +28,7 @@ Cosas que **no** entran: Spring, frameworks de DI, Jackson, frameworks de TUI de
 ## Layout de paquetes (un solo módulo)
 
 ```
-src/main/kotlin/dev/kotycli/
+src/main/kotlin/com/softbenur/kotycli/
   Main.kt                      # clikt: `kotycli [prompt]`, `--plain`, `--acp`, `--provider`, `--mode`
   core/
     Message.kt                 # modelo neutral: Message, Block, StopReason, Completion
