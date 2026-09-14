@@ -93,7 +93,7 @@ Modos:
 
 Además:
 
-- **Reglas** por tool y patrón: `bash(git status*)` allow, `bash(rm -rf*)` deny, `bash(git push --force*)` ask, `create(/etc/**)` deny. Deny gana a allow, allow gana a ask.
+- **Reglas** por tool y patrón: `bash(git status*)` allow, `bash(rm -rf*)` deny, `bash(git push --force*)` ask, `create(/etc/*)` deny. Deny gana a allow, allow gana a ask. El patrón se compara con el comando en `bash` y con la ruta en las tools de fichero; `*` casa con cualquier cosa, barras incluidas, y una regla sin patrón (`edit`) casa con cualquier input.
 - **Guarda de paths**: las tools de fichero solo operan bajo el working dir salvo regla explícita (`--allow-path`).
 - **"Permitir siempre en esta sesión"** como respuesta al `Ask`, y opcionalmente persistir la regla en `.kotycli/settings.json`.
 - Los subagentes heredan la política del padre y nunca pueden ser más permisivos.

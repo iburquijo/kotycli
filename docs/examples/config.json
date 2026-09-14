@@ -1,0 +1,10 @@
+{
+  "provider": "local",
+  "providers": {
+    "local": { "type": "openai", "baseUrl": "http://localhost:11434/v1", "model": "qwen2.5-coder:32b", "contextWindow": 32000 },
+    "corp": { "type": "openai", "baseUrl": "https://llm-gw.corp/v1", "model": "gpt-4.1", "apiKeyEnv": "CORP_LLM_KEY", "contextWindow": 128000 }
+  },
+  "permissionMode": "default",
+  "maxIterationsPerTurn": 50,
+  "http": { "truststore": null, "proxy": null, "connectTimeoutSec": 20 }
+}
