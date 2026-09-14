@@ -44,23 +44,31 @@ class BashTool(private val shell: Shell, initialCwd: Path) : TypedTool<BashInput
         val startCwd = cwd
         if (!Files.isDirectory(startCwd)) return ctx.error("El directorio actual ya no existe: $startCwd")
 
-        val script = shell.wrap(input.command, startCwd)
-        val process = ProcessBuilder(shell.command(script))
-            .directory(startCwd.toFile())
-            .redirectErrorStream(true)
-            .redirectInput(ProcessBuilder.Redirect.from(nullDevice()))
-            .start()
-
+        // Sin puntos de suspensión entre crear el fichero y entrar en el try: una cancelación no puede dejarlo huérfano.
+        val scriptFile = Files.createTempFile("kotycli-", shell.scriptExtension)
         val (output, exitCode) = try {
+            Files.write(scriptFile, shell.scriptBytes(shell.wrap(input.command, startCwd)))
+            val process = ProcessBuilder(shell.command(scriptFile))
+                .directory(startCwd.toFile())
+                .redirectErrorStream(true)
+                .redirectInput(ProcessBuilder.Redirect.from(nullDevice()))
+                .start()
             coroutineScope {
                 val reader = async(Dispatchers.IO) { readCapped(process.inputStream, MAX_CAPTURE) }
-                val bytes = reader.await()
-                val rc = runInterruptible(Dispatchers.IO) { process.waitFor() }
-                bytes to rc
+                try {
+                    val bytes = reader.await()
+                    val rc = runInterruptible(Dispatchers.IO) { process.waitFor() }
+                    bytes to rc
+                } catch (e: CancellationException) {
+                    // Hay que matar el proceso desde dentro del scope: el lector está bloqueado en el pipe y solo
+                    // termina cuando el proceso muere. Si se matara fuera, coroutineScope esperaría al comando entero.
+                    killTree(process)
+                    throw e
+                }
             }
-        } catch (e: CancellationException) {
-            killTree(process)
-            throw e
+        } finally {
+            // En Windows el shell puede tener el fichero abierto un instante tras morir; si no se puede borrar ahora, al salir.
+            runCatching { Files.deleteIfExists(scriptFile) }.onFailure { scriptFile.toFile().deleteOnExit() }
         }
 
         val (text, newCwd) = splitMarker(output)

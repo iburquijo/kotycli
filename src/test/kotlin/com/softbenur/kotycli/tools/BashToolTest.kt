@@ -6,6 +6,7 @@ import com.softbenur.kotycli.testContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -37,10 +38,15 @@ class BashToolTest {
     }
 
     @Test
-    fun `cancelar mata el proceso`() = runTest {
+    fun `cancelar mata el proceso y no deja el script temporal`() = runTest {
+        val started = System.nanoTime()
         val result = withTimeoutOrNull(500) {
             bash.execute(json("command" to "sleep 30; echo nunca"), ToolContext(ctx, "1"))
         }
+        val elapsedMs = (System.nanoTime() - started) / 1_000_000
         assertNull(result)
+        assertTrue(elapsedMs < 10_000, "la cancelación esperó al comando entero: ${elapsedMs}ms")
+        val leftovers = Files.list(Path.of(System.getProperty("java.io.tmpdir"))).use { s -> s.filter { it.fileName.toString().startsWith("kotycli-") && it.fileName.toString().endsWith(shell.scriptExtension) }.toList() }
+        assertTrue(leftovers.isEmpty(), "scripts temporales sin borrar: $leftovers")
     }
 }

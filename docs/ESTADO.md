@@ -54,6 +54,7 @@ Avisos: `kotycli doctor` hace `GET {baseUrl}/models`, que es la API nativa y pue
 - `Tool.execute` recibe un `ToolContext(agent, callId)` con `ok()`/`error()`; el doc 03 describía `ToolContext` con los campos de `ToolEnv`, que ahora vive en `AgentContext.env`.
 - `ToolDefinition` está en `core/` porque la usan `tools/` y `providers/` y la regla es que `tools` no dependa de `providers`.
 - Paquete raíz `com.softbenur.kotycli` (dominio del autor).
+- `bash` ejecuta el script desde un fichero temporal, no como argumento de `-c`: Java en Windows no escapa las comillas dobles dentro de un argumento y `bash.exe` cortaba el script en la primera. Descubierto por el CI de Windows.
 
 ## Siguiente sesión: empezar la v2
 
