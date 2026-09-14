@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -32,6 +33,13 @@ data class Rule(val tool: String, val pattern: String, val decision: Kind) {
     override fun toString() = if (pattern == "*") tool else "$tool($pattern)"
 
     companion object {
+        /** `allow:bash(rg *)`, `deny:create(*)`. Sin prefijo se asume `allow`. */
+        fun parsePrefixed(spec: String): Rule {
+            val colon = spec.indexOf(':')
+            val kind = if (colon > 0) Kind.entries.firstOrNull { it.name.equals(spec.substring(0, colon).trim(), ignoreCase = true) } else null
+            return parse(if (kind == null) spec else spec.substring(colon + 1), kind ?: Kind.ALLOW)
+        }
+
         fun parse(spec: String, kind: Kind): Rule {
             val s = spec.trim()
             val open = s.indexOf('(')
@@ -67,17 +75,25 @@ interface PermissionPolicy {
  */
 class RulePolicy(rules: List<Rule> = emptyList()) : PermissionPolicy {
     private val rules = CopyOnWriteArrayList(rules)
+    private val agentRules = ConcurrentHashMap<List<String>, List<Rule>>()
 
     fun addSessionRule(rule: Rule) { rules += rule }
     fun rules(): List<Rule> = rules.toList()
 
     override fun decide(ctx: AgentContext, tool: Tool, input: JsonObject): Decision {
         val subject = subjectOf(tool, input)
-        val matching = rules.filter { it.matches(tool.name, subject) }
+        val matching = (rules + rulesOf(ctx)).filter { it.matches(tool.name, subject) }
         matching.firstOrNull { it.decision == Rule.Kind.DENY }?.let { return Decision.Deny("regla ${it}") }
         if (matching.any { it.decision == Rule.Kind.ALLOW }) return Decision.Allow
         if (matching.any { it.decision == Rule.Kind.ASK }) return Decision.Ask
         return byMode(ctx.config.permissionMode, tool)
+    }
+
+    /** Las reglas del rol de subagente, compiladas una vez por rol. */
+    private fun rulesOf(ctx: AgentContext): List<Rule> {
+        val specs = ctx.config.permissionRules
+        if (specs.isEmpty()) return emptyList()
+        return agentRules.computeIfAbsent(specs) { it.mapNotNull { spec -> runCatching { Rule.parsePrefixed(spec) }.getOrNull() } }
     }
 
     private fun byMode(mode: PermissionMode, tool: Tool): Decision = when (mode) {

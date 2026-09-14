@@ -124,8 +124,8 @@ Esto es todo el "sistema de hooks". Un punto de corte before/after cubre permiso
 
 ```kotlin
 suspend fun dispatch(ctx: AgentContext, calls: List<ToolUse>): List<ToolResult> = coroutineScope {
-    val (readOnly, mutating) = calls.partition { ctx.tools[it.name]?.readOnly == true }
-    val parallel = readOnly.map { async { runOne(ctx, it) } }
+    val (concurrent, mutating) = calls.partition { ctx.tools[it.name]?.parallel == true }
+    val parallel = concurrent.map { async { runOne(ctx, it) } }
     val serial = mutating.map { runOne(ctx, it) }              // en orden, uno a uno
     (parallel.awaitAll() + serial).sortedBy { r -> calls.indexOfFirst { it.id == r.toolUseId } }
 }
@@ -145,7 +145,7 @@ private suspend fun runOne(ctx: AgentContext, call: ToolUse): ToolResult {
 Reglas:
 
 - Una tool que falla devuelve `ToolResult(isError = true)`. **Nunca** se omite el resultado ni se lanza fuera del dispatcher: el modelo necesita ver el error para corregir. Nada tumba el loop.
-- Tools `readOnly` (`read`, `fetch`) se ejecutan en paralelo. Las demás en serie y en el orden que las pidió el modelo.
+- Las tools paralelizables se ejecutan a la vez. Lo son las `readOnly` (`read`, `fetch`) y `task`, que no es de solo lectura pero sí concurrente: por eso `Tool.parallel` es un campo aparte que por defecto vale `readOnly`. Las demás van en serie y en el orden que las pidió el modelo.
 - El orden de los resultados en el mensaje final sigue el orden de las llamadas.
 
 ## Gestión de contexto

@@ -38,5 +38,8 @@ class SchemaGenTest {
         assertEquals(setOf("path", "old_string", "new_string", "replace_all"), edit["properties"]!!.jsonObject.keys)
         assertEquals(listOf("path", "old_string", "new_string"), edit["required"]!!.jsonArray.map { it.jsonPrimitive.content })
         assertEquals(listOf("command"), BashTool(Shell.detect(), java.nio.file.Path.of(".")).inputSchema["required"]!!.jsonArray.map { it.jsonPrimitive.content })
+        val task = TaskTool(com.softbenur.kotycli.agents.AgentType.BUILTIN.associateBy { it.name }).inputSchema
+        assertEquals(setOf("agent_type", "prompt", "description"), task["properties"]!!.jsonObject.keys)
+        assertEquals(listOf("agent_type", "prompt"), task["required"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
 }

@@ -2,9 +2,9 @@ package com.softbenur.kotycli.tools
 
 import com.softbenur.kotycli.core.Block
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runInterruptible
 import kotlinx.serialization.Serializable
 import java.io.ByteArrayOutputStream
@@ -53,18 +53,18 @@ class BashTool(private val shell: Shell, initialCwd: Path) : TypedTool<BashInput
                 .redirectErrorStream(true)
                 .redirectInput(ProcessBuilder.Redirect.from(nullDevice()))
                 .start()
-            coroutineScope {
-                val reader = async(Dispatchers.IO) { readCapped(process.inputStream, MAX_CAPTURE) }
-                try {
-                    val bytes = reader.await()
-                    val rc = runInterruptible(Dispatchers.IO) { process.waitFor() }
-                    bytes to rc
-                } catch (e: CancellationException) {
-                    // Hay que matar el proceso desde dentro del scope: el lector está bloqueado en el pipe y solo
-                    // termina cuando el proceso muere. Si se matara fuera, coroutineScope esperaría al comando entero.
-                    killTree(process)
-                    throw e
-                }
+            // El lector va en un scope propio a propósito: un `read()` bloqueado en el pipe no se interrumpe, así que
+            // si fuera hijo del turn, cancelar esperaría a que el comando terminase solo. Se abandona y muere con el pipe.
+            val reader = CoroutineScope(Dispatchers.IO).async { readCapped(process.inputStream, MAX_CAPTURE) }
+            try {
+                val bytes = reader.await()
+                val rc = runInterruptible(Dispatchers.IO) { process.waitFor() }
+                bytes to rc
+            } catch (e: CancellationException) {
+                killTree(process)
+                runCatching { process.inputStream.close() }
+                reader.cancel()
+                throw e
             }
         } finally {
             // En Windows el shell puede tener el fichero abierto un instante tras morir; si no se puede borrar ahora, al salir.

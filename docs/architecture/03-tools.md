@@ -10,6 +10,7 @@ interface Tool {
     val description: String            // lo que ve el modelo; aquí se juega la mitad de la calidad
     val inputSchema: JsonObject        // generado desde la data class @Serializable del input
     val readOnly: Boolean              // true => paralelizable y normalmente sin pedir permiso
+    val parallel: Boolean              // ejecutable a la vez que otras llamadas; por defecto = readOnly (`task` lo pone a true)
     val timeout: Duration
     suspend fun execute(input: JsonObject, ctx: ToolContext): ToolResult
 }

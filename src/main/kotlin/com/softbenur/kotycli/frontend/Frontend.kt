@@ -3,6 +3,7 @@ package com.softbenur.kotycli.frontend
 import com.softbenur.kotycli.core.AgentContext
 import com.softbenur.kotycli.core.AgentEvent
 import com.softbenur.kotycli.core.PermissionReply
+import com.softbenur.kotycli.skills.SkillCatalog
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -56,6 +57,8 @@ object Render {
 /** Lo que un frontend le manda al core. Es deliberadamente poco: prompt, cancelar, responder a permisos. */
 interface Session {
     val root: AgentContext
+    /** Para expandir `/nombre args` y completar en la TUI. */
+    val skills: SkillCatalog get() = SkillCatalog(emptyList())
     suspend fun turn(prompt: String)
     fun cancel()
 }

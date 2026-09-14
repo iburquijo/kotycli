@@ -26,6 +26,8 @@ interface Tool {
     val inputSchema: JsonObject
     /** true => paralelizable y normalmente sin pedir permiso. */
     val readOnly: Boolean
+    /** Si se puede ejecutar a la vez que otras llamadas de la misma ronda. `task` lo es sin ser readOnly. */
+    val parallel: Boolean get() = readOnly
     val timeout: Duration
     /** Campos del input que son rutas; los canonicaliza y vigila el interceptor `PathGuard`. */
     val pathFields: List<String> get() = emptyList()

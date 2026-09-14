@@ -28,6 +28,8 @@ data class AgentConfig(
     val maxDepth: Int = 2,
     val maxConcurrentSubagents: Int = 4,
     val permissionMode: PermissionMode = PermissionMode.DEFAULT,
+    /** Reglas de permisos propias de este agente, en el formato `allow:bash(rg *)`. Las usan los roles de subagente. */
+    val permissionRules: List<String> = emptyList(),
 )
 
 /**

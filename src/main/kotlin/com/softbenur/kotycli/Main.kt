@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
+import com.softbenur.kotycli.agents.AgentTypeLoader
 import com.softbenur.kotycli.config.Config
 import com.softbenur.kotycli.config.ConfigFile
 import com.softbenur.kotycli.config.Dirs
@@ -29,11 +30,14 @@ import com.softbenur.kotycli.interceptors.ToolLog
 import com.softbenur.kotycli.interceptors.Truncate
 import com.softbenur.kotycli.prompt.SystemPrompt
 import com.softbenur.kotycli.providers.Providers
+import com.softbenur.kotycli.skills.SkillLoader
 import com.softbenur.kotycli.tools.BashTool
 import com.softbenur.kotycli.tools.CreateTool
 import com.softbenur.kotycli.tools.EditTool
+import com.softbenur.kotycli.tools.FetchTool
 import com.softbenur.kotycli.tools.ReadTool
 import com.softbenur.kotycli.tools.Shell
+import com.softbenur.kotycli.tools.TaskTool
 import com.softbenur.kotycli.tools.ToolEnv
 import com.softbenur.kotycli.tools.ToolRegistry
 import kotlinx.coroutines.Job
@@ -110,11 +114,17 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
     fun session(): Session {
         val provider = Providers.build(config.providerName, config.provider, http)
         val env = ToolEnv(workDir = workDir, http = http, shell = shell, allowedPaths = allowedPaths)
-        val tools = ToolRegistry(listOf(BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool()))
+        val agentTypes = AgentTypeLoader.load(config.dirs)
+        val skills = SkillLoader.load(config.dirs, workDir)
+        val contextPrompt = SystemPrompt.context(config.dirs, shell, workDir, skills)
+        val tools = ToolRegistry(listOf(
+            BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool(), FetchTool(),
+            TaskTool(agentTypes, contextPrompt, config.file.subagentModel),
+        ))
         val policy = RulePolicy(config.settings.rules())
         val interceptors = listOf(PathGuard(), Permissions(policy), ToolLog(config.dirs.logsDir.resolve("tools.jsonl")), Truncate())
         val agentConfig = AgentConfig(
-            systemPrompt = SystemPrompt.build(config.dirs, shell, workDir),
+            systemPrompt = SystemPrompt.build(config.dirs, shell, workDir, skills),
             model = config.model,
             maxOutputTokens = config.provider.maxOutputTokens,
             maxIterationsPerTurn = config.file.maxIterationsPerTurn ?: 50,
@@ -123,6 +133,7 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
         val root = AgentContext(agentConfig, provider, tools, interceptors, Budget(config.file.maxTokensPerSession), env)
         return object : Session {
             override val root = root
+            override val skills = skills
             private var current: Job? = null
             override suspend fun turn(prompt: String) = coroutineScope {
                 val job = launch { runLoop(root, prompt) }
