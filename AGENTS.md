@@ -2,6 +2,8 @@
 
 Agente de código de terminal en Kotlin/JVM. La arquitectura está en `docs/architecture/` y las decisiones cerradas en `docs/adr/`. Si un cambio contradice un ADR, primero se escribe otro ADR.
 
+**Al empezar una sesión, lee `docs/ESTADO.md`**: qué está hecho, qué está verificado y por dónde sigue el trabajo. Al terminar un tramo, actualízalo.
+
 ## Build y tests
 
 - `./gradlew build` compila, pasa los tests y genera el fat jar en `build/libs/kotycli.jar`.

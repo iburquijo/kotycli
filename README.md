@@ -3,7 +3,7 @@ Estoy hasta los huevos de las clis de agentes que dependen del sistema operativo
 
 ## Estado
 
-v1 en marcha: loop, tools `bash`, `read`, `edit` y `create`, proveedor OpenAI-compatible (Ollama, gateways, vLLM...), `HttpClient` único con truststore y proxy corporativos, permisos como interceptor, TUI append-only y modo `--plain`. Lo que falta por versión está en el [roadmap](docs/architecture/07-build-y-distribucion.md#roadmap).
+v1 en marcha: loop, tools `bash`, `read`, `edit` y `create`, proveedor OpenAI-compatible (Ollama, gateways, vLLM...), `HttpClient` único con truststore y proxy corporativos, permisos como interceptor, TUI append-only y modo `--plain`. Lo que falta por versión está en el [roadmap](docs/architecture/07-build-y-distribucion.md#roadmap); el estado actual y el siguiente paso, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
 ## Uso
 
