@@ -1,18 +1,19 @@
 package com.softbenur.kotycli.prompt
 
 import com.softbenur.kotycli.config.Dirs
+import com.softbenur.kotycli.skills.SkillCatalog
 import com.softbenur.kotycli.tools.Shell
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
 
-/** Ensambla el system prompt: base + entorno + `AGENTS.md` (global y del proyecto). Los skills llegan en v2. */
+/** Ensambla el system prompt: base + entorno + `AGENTS.md` (global y del proyecto) + la lista de skills. */
 object SystemPrompt {
-    fun build(dirs: Dirs, shell: Shell, workDir: Path, today: LocalDate = LocalDate.now()): String =
-        BASE.trimIndent() + "\n\n" + context(dirs, shell, workDir, today)
+    fun build(dirs: Dirs, shell: Shell, workDir: Path, skills: SkillCatalog? = null, today: LocalDate = LocalDate.now()): String =
+        BASE.trimIndent() + "\n\n" + context(dirs, shell, workDir, skills, today)
 
-    /** La parte que no depende del rol: entorno y `AGENTS.md`. Los subagentes la reciben con su propio prompt. */
-    fun context(dirs: Dirs, shell: Shell, workDir: Path, today: LocalDate = LocalDate.now()): String {
+    /** La parte que no depende del rol: entorno, `AGENTS.md` y skills. Los subagentes la reciben con su propio prompt. */
+    fun context(dirs: Dirs, shell: Shell, workDir: Path, skills: SkillCatalog? = null, today: LocalDate = LocalDate.now()): String {
         val parts = mutableListOf("""
             # Entorno
             - Sistema operativo: ${System.getProperty("os.name")} ${System.getProperty("os.arch")}
@@ -23,6 +24,7 @@ object SystemPrompt {
         agentsFiles(dirs, workDir).forEach { (path, text) ->
             parts += "# Instrucciones de $path\n\n$text"
         }
+        skills?.promptSection()?.let { parts += it }
         return parts.joinToString("\n\n")
     }
 

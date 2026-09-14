@@ -43,7 +43,7 @@ class Plain(
             val text = line.trim()
             if (text.isEmpty()) continue
             if (text == "/exit" || text == "/quit") break
-            session.turn(text)
+            session.turn(session.skills.expand(text) ?: text)
         }
         printer.cancelAndJoin()
     }

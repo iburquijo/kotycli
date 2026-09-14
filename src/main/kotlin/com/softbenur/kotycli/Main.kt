@@ -30,6 +30,7 @@ import com.softbenur.kotycli.interceptors.ToolLog
 import com.softbenur.kotycli.interceptors.Truncate
 import com.softbenur.kotycli.prompt.SystemPrompt
 import com.softbenur.kotycli.providers.Providers
+import com.softbenur.kotycli.skills.SkillLoader
 import com.softbenur.kotycli.tools.BashTool
 import com.softbenur.kotycli.tools.CreateTool
 import com.softbenur.kotycli.tools.EditTool
@@ -113,7 +114,8 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
         val provider = Providers.build(config.providerName, config.provider, http)
         val env = ToolEnv(workDir = workDir, http = http, shell = shell, allowedPaths = allowedPaths)
         val agentTypes = AgentTypeLoader.load(config.dirs)
-        val contextPrompt = SystemPrompt.context(config.dirs, shell, workDir)
+        val skills = SkillLoader.load(config.dirs, workDir)
+        val contextPrompt = SystemPrompt.context(config.dirs, shell, workDir, skills)
         val tools = ToolRegistry(listOf(
             BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool(),
             TaskTool(agentTypes, contextPrompt, config.file.subagentModel),
@@ -121,7 +123,7 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
         val policy = RulePolicy(config.settings.rules())
         val interceptors = listOf(PathGuard(), Permissions(policy), ToolLog(config.dirs.logsDir.resolve("tools.jsonl")), Truncate())
         val agentConfig = AgentConfig(
-            systemPrompt = SystemPrompt.build(config.dirs, shell, workDir),
+            systemPrompt = SystemPrompt.build(config.dirs, shell, workDir, skills),
             model = config.model,
             maxOutputTokens = config.provider.maxOutputTokens,
             maxIterationsPerTurn = config.file.maxIterationsPerTurn ?: 50,
@@ -130,6 +132,7 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
         val root = AgentContext(agentConfig, provider, tools, interceptors, Budget(config.file.maxTokensPerSession), env)
         return object : Session {
             override val root = root
+            override val skills = skills
             private var current: Job? = null
             override suspend fun turn(prompt: String) = coroutineScope {
                 val job = launch { runLoop(root, prompt) }
