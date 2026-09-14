@@ -1,4 +1,4 @@
-# ADR 0007. Skills en formato Agent Skills
+# ADR 0007. Skills en formato Agent Skills, sin tool dedicada
 
 **Estado:** aceptado
 
@@ -9,16 +9,19 @@ Queremos instrucciones reutilizables por tarea, cargadas solo cuando aplican par
 ## Decisión
 
 - Adoptar ese formato sin extensiones propias obligatorias.
-- Descripciones siempre en el system prompt; cuerpo bajo demanda vía tool `skill` o invocación explícita `/nombre`.
+- Descripciones y rutas siempre en el system prompt; cuerpo bajo demanda **leyéndolo con `read`**. No hay tool `skill`: seguimos en seis tools (ADR 0003) y el modelo ya sabe leer ficheros.
+- Invocación explícita `/nombre argumentos` desde el frontend.
 - Búsqueda en `.kotycli/skills/` (proyecto), `~/.kotycli/skills/` (usuario) y builtin embebidos, en ese orden de precedencia.
-- Las definiciones de subagentes usan el mismo formato de markdown con frontmatter, para tener un solo parser.
+- Las definiciones de roles de subagente usan el mismo markdown con frontmatter, para tener un solo parser.
+- Instrucciones siempre presentes van en `KOTYCLI.md`, no en un skill.
 
 ## Alternativas descartadas
 
 - **Formato propio (YAML, JSON)**: incompatible con los skills existentes, sin ventaja.
 - **Cargar todos los skills en el system prompt**: no escala; con 20 skills se van miles de tokens en cada llamada.
+- **Tool `skill` dedicada**: una tool más por algo que `read` ya hace. La única ventaja sería un evento de UI específico, y no compensa.
 
 ## Consecuencias
 
 - Un skill escrito para otro harness funciona aquí si no depende de tools que no tenemos.
-- Necesitamos un parser de frontmatter YAML plano. Suficiente con `clave: valor`; no se soporta YAML completo salvo que aparezca la necesidad.
+- Necesitamos un parser de frontmatter YAML plano. Suficiente con `clave: valor`.

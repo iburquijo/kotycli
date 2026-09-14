@@ -1,99 +1,75 @@
 # 03. Tools
 
+Seis tools. Ni una más hasta que alguien la eche de menos con un caso concreto.
+
 ## Contrato
 
 ```kotlin
 interface Tool {
     val name: String
     val description: String            // lo que ve el modelo; aquí se juega la mitad de la calidad
-    val inputSchema: JsonObject        // JSON Schema del input
+    val inputSchema: JsonObject        // generado desde la data class @Serializable del input
     val readOnly: Boolean              // true => paralelizable y normalmente sin pedir permiso
     val timeout: Duration
     suspend fun execute(input: JsonObject, ctx: ToolContext): ToolResult
 }
 
 class ToolContext(
-    val session: Session,
-    val cwd: Path,
+    val agent: AgentContext,
+    val workDir: Path,                 // canónico; todo path del input se resuelve contra él
     val fileTracker: FileTracker,      // ficheros leídos en esta sesión y su mtime
+    val http: HttpClient,              // el único, con truststore y proxy ya resueltos
 )
 
 class ToolRegistry(tools: List<Tool>) {
     operator fun get(name: String): Tool?
-    fun definitions(): List<ToolDefinition>       // lo que se manda al proveedor
-    fun restrictedTo(names: Set<String>): ToolRegistry   // para subagentes
+    fun definitions(): List<ToolDefinition>              // lo que se manda al proveedor
+    fun restrictedTo(names: Set<String>): ToolRegistry   // toolsets por rol de subagente
 }
 ```
 
-Cada tool vive en su propio fichero bajo `tools/`. El input se deserializa con `kotlinx.serialization` a una `data class` propia de la tool; el `inputSchema` se genera a mano por ahora (es un JSON pequeño y estable, y así controlamos las descripciones de cada campo).
+### Schema desde `@Serializable`
 
-## Tools del MVP
+Cada tool declara su input como `data class` anotada. El JSON Schema se genera del `SerialDescriptor` de `kotlinx.serialization`, con una anotación propia `@Description("...")` por campo para el texto que ve el modelo. Un solo sitio de verdad: cambiar un campo cambia el schema, la deserialización y la descripción.
 
-### `bash`
+```kotlin
+@Serializable
+data class EditInput(
+    @Description("Ruta relativa al working dir") val path: String,
+    @Description("Texto exacto a sustituir. Tiene que aparecer una sola vez") val old_string: String,
+    @Description("Texto nuevo") val new_string: String,
+)
+```
 
-Ejecuta un comando en un shell. Es la tool de amplitud: todo lo que no tenga tool dedicada pasa por aquí.
+### Reglas comunes
 
-- Input: `command: String`, `timeout_ms: Int?` (máx. 10 min), `description: String?` (lo que la UI enseña al usuario).
-- Ejecución con `ProcessBuilder`, `sh -c` en POSIX y `cmd /c` o PowerShell en Windows. El shell se detecta al arrancar.
-- `cwd` persiste entre llamadas dentro de la sesión. El resto del estado del shell no (cada llamada es un proceso nuevo).
-- Salida: stdout y stderr mezclados en orden, exit code al final. Truncado a 30k caracteres conservando cabeza y cola.
-- Al cancelar, se destruye el proceso y todos sus descendientes.
-- `readOnly = false` siempre. No intentamos adivinar si un comando es de lectura: el modelo tiene `read`, `glob` y `grep` para eso, y la política de permisos puede tener un allowlist de prefijos (`git status`, `ls`, `cat`).
+- **Paths canonicalizados** contra el working dir por el interceptor `PathGuard` antes de llegar a la tool. Una tool nunca ve `../../etc`.
+- **Truncado centralizado** en el interceptor `Truncate` (~30-50 KB, cabeza y cola, aviso en el texto). Las tools no truncan por su cuenta.
+- **Errores como `isError = true`**, nunca excepciones fuera de `execute`. Un error nunca tumba el loop.
+- **Descripciones honestas con Windows**: la description de `bash` dice explícitamente qué shell hay debajo.
 
-### `read`
+## Las seis tools
 
-Lee un fichero. Devuelve el contenido con números de línea (`cat -n`) para que `edit` sea preciso.
+| Tool | Contrato | Detalle Windows / decisión clave |
+|------|----------|----------------------------------|
+| `bash` | Ejecuta un comando con timeout (~2 min), stdout y stderr mezclados en orden, exit code al final. | Shell explícito en la description (Git Bash o PowerShell, detectado al arrancar). Al cancelar, mata el árbol entero vía `ProcessHandle.descendants()`. `cwd` persiste entre llamadas; el resto del estado del shell no. |
+| `read` | Numera líneas (`cat -n`), `offset`/`limit`, truncado duro avisado. Registra path y `mtime` en `FileTracker`. | Detecta binarios y se niega con mensaje claro. `readOnly = true`. |
+| `edit` | `str_replace` con match único: 0 ó 2+ apariciones = error explicado con el conteo. `replace_all` opcional. | Exige lectura previa en la sesión y `mtime` sin cambios ("el fichero cambió desde que lo leíste"). Normaliza CRLF antes de comparar; preserva el line ending original al escribir. |
+| `create` | Crea un fichero nuevo con el contenido dado. Crea directorios intermedios. | **Falla si existe.** Sobreescribir exige pasar por `edit`, o borrar con `bash` primero. Evita que el modelo machaque algo que no ha visto. |
+| `fetch` | HTTP GET, HTML a markdown (jsoup), límite de tamaño, timeout 30 s. | Aquí vive el trabajo de truststore y proxy, heredado del `HttpClient` común. `readOnly = true`. Solo `http(s)`; nada de `file://`. |
+| `task` | Lanza un subagente (`prompt`, `agent_type`). Devuelve solo su mensaje final. | Toolset por rol: `explorer` = solo lectura; `implementor` = todo menos `task`. Ver [04-subagentes](04-subagentes.md). |
 
-- Input: `path`, `offset: Int?`, `limit: Int?` (por defecto 2000 líneas).
-- Registra el fichero y su `mtime` en `FileTracker`. Esto es lo que habilita la comprobación de `edit`.
-- Ficheros binarios: rechaza con mensaje claro. Imágenes: fuera del MVP.
-- `readOnly = true`.
+### Por qué `create` y no `write`
 
-### `write`
+Un `write` que sobreescribe es la forma más fácil de perder trabajo: el modelo lee una versión, razona, y escribe encima de otra. `create` que falla si existe más `edit` con comprobación de `mtime` cubren los mismos casos con una invariante clara: **nada se sobreescribe sin haberse leído**. Reescribir un fichero entero es raro y se puede hacer con `edit` (old_string = contenido completo) o con `bash rm` + `create`, ambos visibles y gateables.
 
-Crea o sobreescribe un fichero completo.
+### Por qué no hay `glob` ni `grep`
 
-- Input: `path`, `content`.
-- Si el fichero existe y no ha sido leído en esta sesión, falla: "Lee el fichero antes de sobreescribirlo". Evita que el modelo machaque algo que no ha visto.
-- Crea directorios intermedios.
-- `readOnly = false`, requiere permiso en modo por defecto.
-
-### `edit`
-
-Reemplazo exacto de una cadena dentro de un fichero.
-
-- Input: `path`, `old_string`, `new_string`, `replace_all: Boolean = false`.
-- Invariantes:
-  1. El fichero tiene que haberse leído en esta sesión (`FileTracker`).
-  2. El `mtime` actual tiene que coincidir con el registrado al leerlo. Si no, falla con "el fichero cambió desde que lo leíste, vuelve a leerlo".
-  3. `old_string` tiene que aparecer exactamente una vez (salvo `replace_all`). Cero ocurrencias o más de una: error con el conteo.
-- Tras escribir, actualiza el `mtime` en `FileTracker`.
-- `readOnly = false`, requiere permiso en modo por defecto.
-
-Esta tool es el motivo principal para no dejar que todo pase por `bash`: la comprobación de staleness no se puede hacer con `sed`.
-
-### `glob`
-
-Busca ficheros por patrón (`**/*.kt`). Devuelve rutas ordenadas por fecha de modificación.
-
-- Input: `pattern`, `path: String?`.
-- Implementación con `java.nio.file.PathMatcher` + `Files.walk`. Respeta `.gitignore` en una segunda iteración.
-- `readOnly = true`.
-
-### `grep`
-
-Búsqueda de contenido por regex.
-
-- Input: `pattern`, `path: String?`, `glob: String?`, `output_mode: files | content | count`, `context: Int?`.
-- Si hay `rg` en el PATH, se delega en él (es mucho más rápido y ya respeta `.gitignore`). Si no, implementación propia en Kotlin con `Regex` sobre `Files.walk`. El resultado tiene el mismo formato en ambos casos.
-- `readOnly = true`.
-
-## Tools de sistema (no son "de fichero" pero viven en el mismo registry)
-
-- `agent`: lanza un subagente. Ver [04-subagentes](04-subagentes.md).
-- `skill`: carga un skill en contexto. Ver [05-skills](05-skills.md).
+`rg` y `fd` por `bash` hacen lo mismo y el modelo ya sabe usarlos. Lo que se pierde es paralelismo automático (bash siempre es serie) y permisos granulares. Si en la práctica la fricción es real, son candidatas a promoción: el criterio del ADR 0003 (gatear, auditar, paralelizar, invariantes) sigue valiendo. Hasta entonces, seis.
 
 ## Permisos
+
+Viven en el interceptor `Permissions`, no en las tools ni en el prompt.
 
 ```kotlin
 sealed interface Decision {
@@ -103,23 +79,24 @@ sealed interface Decision {
 }
 
 interface PermissionPolicy {
-    fun decide(session: Session, tool: Tool, input: JsonObject): Decision
+    fun decide(ctx: AgentContext, tool: Tool, input: JsonObject): Decision
 }
 ```
 
-Modos, de más restrictivo a menos:
+Modos:
 
-| Modo | `read`/`glob`/`grep` | `edit`/`write` | `bash` | `agent` |
-|------|----------------------|----------------|--------|---------|
+| Modo | `read`/`fetch` | `edit`/`create` | `bash` | `task` |
+|------|----------------|-----------------|--------|--------|
 | `default` | Allow | Ask | Ask (Allow si matchea allowlist) | Allow |
 | `accept-edits` | Allow | Allow | Ask (Allow si matchea allowlist) | Allow |
 | `yolo` | Allow | Allow | Allow | Allow |
 
 Además:
 
-- **Allowlist / denylist** en configuración: reglas `bash(git status*)`, `bash(rm -rf*)` -> deny, `edit(src/**)`, `write(/etc/**)` -> deny. Deny gana a allow, allow gana a ask.
-- **Sandbox de rutas**: por defecto `read`/`write`/`edit`/`glob`/`grep` solo operan bajo el `cwd` del proyecto. Salir requiere `--allow-path` o una regla explícita.
-- **"Recordar esta decisión"**: cuando el usuario acepta un `Ask`, puede persistirlo como regla en `.kotycli/settings.json`.
-- Los subagentes heredan la política del padre y nunca pueden ser más permisivos que él.
+- **Reglas** por tool y patrón: `bash(git status*)` allow, `bash(rm -rf*)` deny, `bash(git push --force*)` ask, `create(/etc/**)` deny. Deny gana a allow, allow gana a ask.
+- **Guarda de paths**: las tools de fichero solo operan bajo el working dir salvo regla explícita (`--allow-path`).
+- **"Permitir siempre en esta sesión"** como respuesta al `Ask`, y opcionalmente persistir la regla en `.kotycli/settings.json`.
+- Los subagentes heredan la política del padre y nunca pueden ser más permisivos.
+- Sin frontend que responda (`--plain` sin TTY, timeout), `Ask` se resuelve como `Deny`.
 
-El `Ask` se resuelve con un `AgentEvent.PermissionRequested` que la UI responde. En modo `--print` (sin TTY), `Ask` se convierte en `Deny` automáticamente.
+El `Ask` se materializa como `AgentEvent.PermissionAsk`. En la TUI es la línea `[s] permitir · [S] siempre en esta sesión · [n] denegar`; en ACP es `session/request_permission`; en Emacs lo pinta agent-shell.

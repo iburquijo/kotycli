@@ -3,4 +3,4 @@ Estoy hasta los huevos de las clis de agentes que dependen del sistema operativo
 
 ## Arquitectura
 
-La arquitectura del harness (loop, tools, subagentes, skills, proveedores) está en [`docs/architecture/`](docs/architecture/README.md). Las decisiones cerradas, en [`docs/adr/`](docs/adr/README.md).
+La arquitectura del harness (loop, seis tools, subagentes, skills, proveedores, frontends TUI/plain/ACP y red corporativa) está en [`docs/architecture/`](docs/architecture/README.md). Las decisiones cerradas, en [`docs/adr/`](docs/adr/README.md).
