@@ -24,6 +24,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.clikt)
     implementation(libs.jline)
+    implementation(libs.jsoup)
     implementation(libs.slf4j.api)
     runtimeOnly(libs.logback.classic)
 

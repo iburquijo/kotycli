@@ -92,13 +92,14 @@ fun testContext(
     maxIterations: Int = 10,
     budget: Budget = Budget(),
     depth: Int = 0,
+    http: java.net.http.HttpClient? = null,
 ): AgentContext = AgentContext(
     config = AgentConfig(systemPrompt = "test", model = "m", maxIterationsPerTurn = maxIterations, permissionMode = mode),
     provider = provider,
     tools = ToolRegistry(tools),
     interceptors = interceptors,
     budget = budget,
-    env = ToolEnv(workDir = workDir.toRealPath(), shell = Shell.detect()),
+    env = ToolEnv(workDir = workDir.toRealPath(), shell = Shell.detect(), http = http),
     depth = depth,
 )
 

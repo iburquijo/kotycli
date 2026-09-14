@@ -34,6 +34,7 @@ import com.softbenur.kotycli.skills.SkillLoader
 import com.softbenur.kotycli.tools.BashTool
 import com.softbenur.kotycli.tools.CreateTool
 import com.softbenur.kotycli.tools.EditTool
+import com.softbenur.kotycli.tools.FetchTool
 import com.softbenur.kotycli.tools.ReadTool
 import com.softbenur.kotycli.tools.Shell
 import com.softbenur.kotycli.tools.TaskTool
@@ -117,7 +118,7 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
         val skills = SkillLoader.load(config.dirs, workDir)
         val contextPrompt = SystemPrompt.context(config.dirs, shell, workDir, skills)
         val tools = ToolRegistry(listOf(
-            BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool(),
+            BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool(), FetchTool(),
             TaskTool(agentTypes, contextPrompt, config.file.subagentModel),
         ))
         val policy = RulePolicy(config.settings.rules())

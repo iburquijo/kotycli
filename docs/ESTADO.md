@@ -14,6 +14,10 @@ Tramo 2 (skills):
 - Los subagentes también ven la lista: va en `SystemPrompt.context()`.
 - Sigue faltando `/reload` y los skills builtin embebidos en el jar.
 
+Tramo 3 (tool `fetch`, lo que quedaba de v1.1):
+
+- `tools/FetchTool.kt`: GET sobre el `HttpClient` común, solo `http(s)`, timeout de 30 s y corte a 512 KB. El HTML vuelve como markdown (jsoup, quitando `script`, `style`, `nav`, `header`, `footer`…); el resto tal cual, y `raw: true` desactiva la conversión. Con esto el toolset de `explorer` ya existe entero.
+
 Además, arreglado un fallo de cancelación en `bash`: el lector de la salida era hijo del turn y un `read()` bloqueado no se interrumpe, así que si `ProcessHandle.descendants()` no ve a los nietos (pasa en contenedores sin `/proc` completo) el nieto mantenía el pipe abierto y Ctrl+C tardaba lo que tardase el comando. Ahora el lector va en su propio scope y se abandona al cancelar. Eso era el test flaky de `BashToolTest`.
 
 Tramo 1 (`task` y subagentes):
@@ -27,7 +31,7 @@ Tramo 1 (`task` y subagentes):
 - `SystemPrompt.context()`: el bloque de entorno + `AGENTS.md` se separa del prompt base para dárselo al hijo junto al prompt de su rol.
 - Actualizados los docs 02, 03 y 04.
 
-46 tests en total (12 nuevos), verde cinco veces seguidas.
+49 tests en total (15 nuevos), verde cinco veces seguidas.
 
 Pendiente antes de fiarse: nadie ha visto todavía un subagente ni un skill contra un proveedor real, solo contra el `FakeProvider`.
 
@@ -87,10 +91,9 @@ Avisos: `kotycli doctor` hace `GET {baseUrl}/models`, que es la API nativa y pue
 
 ## Siguiente sesión: seguir la v2
 
-Lo que queda de v1.1 es pequeño y se puede hacer al entrar en v2 o intercalado:
+De v1.1 solo queda esto:
 
-- Tool `fetch` (jsoup ya está en el catálogo, sin usar). `readOnly = true`, solo `http(s)`, usa `ToolEnv.http`.
-- Comandos `/` en la TUI con completer de JLine: `/compact` (implica escribir la compactación en `ContextManager`, nivel 3), `/config`, `/copy`, `/edit` al `$EDITOR`, `/reload`.
+- Comandos `/` en la TUI: `/compact` (implica escribir la compactación en `ContextManager`, nivel 3), `/config`, `/copy`, `/edit` al `$EDITOR`, `/reload`. El completer de JLine ya está puesto, con los skills dentro.
 
 v2 según el roadmap:
 
@@ -98,7 +101,7 @@ v2 según el roadmap:
 2. ~~**Skills**~~ hecho.
 3. **Proveedor `copilot`** (`06-proveedores.md`, ADR 0012): `OpenAiProvider` con un `Authenticator` que hace device flow, exchange de token y cabeceras `Editor-Version`/`Copilot-Integration-Id`. Token en `~/.kotycli/auth/github.json`. Tests contra fixtures, nunca contra la API real.
 
-Siguiente: la tool `fetch`, que conviene hacer pronto porque el toolset de `explorer` ya la nombra y todavía no existe, y después Copilot cuando haya acceso para probarlo. Cada tramo termina con tests y con esta nota actualizada.
+Siguiente: Copilot cuando haya acceso para probarlo, y los comandos `/` que faltan. Cada tramo termina con tests y con esta nota actualizada.
 
 ## Cómo retomar
 
