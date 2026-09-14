@@ -16,3 +16,4 @@ Una decisión por fichero. Formato: contexto, decisión, alternativas, consecuen
 | [0010](0010-editores-via-acp.md) | Emacs y otros editores vía ACP, no vía plugin propio | aceptado |
 | [0011](0011-httpclient-unico.md) | Un único HttpClient con truststore y proxy corporativos | aceptado |
 | [0012](0012-copilot-con-salida-de-emergencia.md) | Copilot como proveedor principal, OpenAI-compatible como plan B permanente | aceptado |
+| [0013](0013-estandares-abiertos.md) | Estándares abiertos para todo lo que ve el modelo o comparte el usuario | aceptado |

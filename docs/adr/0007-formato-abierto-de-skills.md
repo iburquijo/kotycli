@@ -13,7 +13,7 @@ Queremos instrucciones reutilizables por tarea, cargadas solo cuando aplican par
 - Invocación explícita `/nombre argumentos` desde el frontend.
 - Búsqueda en `.agents/skills/` (proyecto), `~/.agents/skills/` (usuario) y builtin embebidos, en ese orden de precedencia.
 - Las definiciones de roles de subagente usan el mismo markdown con frontmatter, para tener un solo parser.
-- Instrucciones siempre presentes van en `KOTYCLI.md`, no en un skill.
+- Instrucciones siempre presentes van en `AGENTS.md` (estándar agents.md), no en un skill ni en un fichero propio.
 
 ## Alternativas descartadas
 

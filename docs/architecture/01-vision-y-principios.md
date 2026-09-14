@@ -43,4 +43,5 @@ Todo lo que no falle en manos de otros (el editor, el terminal, el modelo, el cl
 7. **Presupuestos explícitos.** Máximo de iteraciones por turn, de tokens por sesión, de tiempo por comando y de profundidad de subagentes.
 8. **Un `HttpClient` para todo.** Truststore corporativo y proxy resueltos una vez, en un sitio. Proveedores y `fetch` lo heredan.
 9. **Configuración en ficheros, no en código.** Proveedor, modelo y permisos se leen de `~/.kotycli/` y de `.kotycli/` en el proyecto. Skills y agentes viven en `.agents/` (`~/.agents/` y `<repo>/.agents/`), el directorio estándar de Agent Skills, para que sean compartibles con otros harnesses.
-10. **Un módulo hasta que duela.**
+10. **Estándares abiertos para todo lo que ve el modelo o comparte el usuario, sin excepción.** Instrucciones de proyecto en `AGENTS.md`, skills en formato Agent Skills bajo `.agents/skills/`, editores vía ACP, wire OpenAI-compatible, MCP cuando llegue. Lo único con nombre propio es `.kotycli/` para la configuración del harness. Si aparece un formato o fichero inventado aquí, es un bug (ADR 0013).
+11. **Un módulo hasta que duela.**

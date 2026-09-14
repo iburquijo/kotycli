@@ -72,7 +72,7 @@ src/main/kotlin/dev/kotycli/
     plain/Plain.kt             # sin ANSI, sin raw mode
     acp/Acp.kt                 # JSON-RPC por stdio
   prompt/
-    SystemPrompt.kt            # ensambla: base + KOTYCLI.md + lista de skills + entorno (shell, OS, cwd)
+    SystemPrompt.kt            # ensambla: base + AGENTS.md + lista de skills + entorno (shell, OS, cwd)
 ```
 
 Regla de dependencias entre paquetes (se verifica en CI):
@@ -88,18 +88,18 @@ nadie fuera de providers/<x> -> tipos de wire de <x>
 
 ## Ficheros en disco
 
-Dos raíces con responsabilidades distintas: `.kotycli/` es configuración y estado del harness; `.agents/` es el directorio estándar de Agent Skills, compartible con otros harnesses.
+Dos raíces con responsabilidades distintas: `.kotycli/` es configuración y estado del harness, y es lo único propio. Todo lo que ve el modelo o comparte el usuario (`AGENTS.md`, skills, roles) usa formatos y ubicaciones estándar, compartibles con cualquier otro harness.
 
 ```
 ~/.kotycli/
   config.json
   settings.json          # reglas de permisos persistidas
   auth/github.json       # token de device flow (solo Copilot)
-  KOTYCLI.md
   logs/                  # app.log, tools.jsonl
   sessions/<id>.jsonl    # historial serializado, para --resume (después)
 
 ~/.agents/
+  AGENTS.md              # instrucciones globales del usuario
   skills/<nombre>/SKILL.md
   agents/<rol>.md
 
@@ -109,7 +109,7 @@ Dos raíces con responsabilidades distintas: `.kotycli/` es configuración y est
 <repo>/.agents/
   skills/
   agents/
-<repo>/KOTYCLI.md
+<repo>/AGENTS.md
 ```
 
 ## Roadmap
@@ -118,7 +118,7 @@ Dos raíces con responsabilidades distintas: `.kotycli/` es configuración y est
 |---------|-----------|-------------------|
 | **v1** | Loop + 4 tools (`bash`, `read`, `edit`, `create`), TUI append-only pelada, proveedor `openai` contra Ollama o un gateway. Sin subagentes, sin `/`, sin pager. `HttpClient` con truststore y proxy desde el día uno. | Resolver un refactor real en un repo propio |
 | **v1.1** | `fetch`, comandos `/` con JLine (`/compact`, `/config`, `/copy`, `/edit`), `/edit` al `$EDITOR`, interceptores `Permissions` y `ToolLog`, `--plain`. | Usarlo a diario en el trabajo |
-| **v2** | Proveedor `copilot` (device flow, exchange, headers). Tool `task` con roles `explorer` e `implementor`, presupuesto compartido, cancelación en cascada. Skills y `KOTYCLI.md`. Pager vim si apetece. | Exploraciones grandes sin reventar el contexto |
+| **v2** | Proveedor `copilot` (device flow, exchange, headers). Tool `task` con roles `explorer` e `implementor`, presupuesto compartido, cancelación en cascada. Skills y `AGENTS.md`. Pager vim si apetece. | Exploraciones grandes sin reventar el contexto |
 | **v3** | Frontend ACP por stdio: `Flow<AgentEvent>` mapeado a `session/update` y `PermissionAsk` a `session/request_permission`. | Trabajar desde Emacs con agent-shell sin escribir elisp. Gratis: Zed y Neovim |
 | después | Adaptador `anthropic`, `--resume`, MCP cliente por stdio, `glob`/`grep` si la fricción lo justifica, AppCDS o native-image. | |
 

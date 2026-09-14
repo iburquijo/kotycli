@@ -50,11 +50,11 @@ El usuario también puede invocar un skill explícitamente con `/nombre argument
 
 - No define tools nuevas. Para eso está el registry (y, más adelante, MCP).
 - No cambia permisos. Un skill puede decir "ejecuta `rm -rf build`" y el interceptor sigue pidiendo confirmación.
-- No se carga entero en el system prompt. Para instrucciones siempre presentes está `KOTYCLI.md`.
+- No se carga entero en el system prompt. Para instrucciones siempre presentes está `AGENTS.md`.
 
-## Instrucciones de proyecto: `KOTYCLI.md`
+## Instrucciones de proyecto: `AGENTS.md`
 
-Un fichero `KOTYCLI.md` en la raíz del proyecto (y `~/.kotycli/KOTYCLI.md` para el usuario) se inyecta siempre al system prompt. Es el sitio para convenciones del repo, comandos de build y el shell que hay debajo de `bash`. Se mantiene corto: todo lo que se pueda mover a un skill, se mueve.
+Un fichero `AGENTS.md` en la raíz del proyecto, siguiendo el estándar abierto agents.md que ya leen Codex, Cursor, Copilot y otros, se inyecta siempre al system prompt. También `~/.agents/AGENTS.md` para instrucciones globales del usuario. No hay fichero de instrucciones propio: el mismo `AGENTS.md` que el equipo ya tiene en el repo sirve tal cual. Es el sitio para convenciones del repo, comandos de build y el shell que hay debajo de `bash`. Se mantiene corto: todo lo que se pueda mover a un skill, se mueve.
 
 ## Caché
 

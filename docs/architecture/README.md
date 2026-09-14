@@ -10,7 +10,7 @@ kotycli es un agente de código de terminal, propio y mínimo: seis tools, un lo
 | [02-agent-loop](02-agent-loop.md) | `runLoop`, modelo de mensajes, dispatcher e interceptores, contexto, cancelación, eventos, presupuestos |
 | [03-tools](03-tools.md) | Contrato, schema desde `@Serializable`, las seis tools, permisos |
 | [04-subagentes](04-subagentes.md) | La tool `task`: roles, contexto virgen, presupuesto compartido, profundidad 2 |
-| [05-skills](05-skills.md) | Skills en formato abierto, carga bajo demanda con `read`, `KOTYCLI.md` |
+| [05-skills](05-skills.md) | Skills en formato abierto, carga bajo demanda con `read`, `AGENTS.md` |
 | [06-proveedores](06-proveedores.md) | Interfaz `Provider`, adaptadores `openai`, `copilot` y `anthropic`, configuración |
 | [07-build-y-distribucion](07-build-y-distribucion.md) | Gradle, shadow jar, dependencias, layout de paquetes, roadmap v1 a v3 |
 | [08-frontends](08-frontends.md) | TUI append-only, `--plain`, ACP para Emacs/Zed/Neovim, comandos `/`, pager |
