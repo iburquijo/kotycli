@@ -27,14 +27,15 @@ class Shell(val kind: Kind, val executable: String) {
 
     /**
      * Envuelve el comando del modelo para que arranque en `cwd` y al final imprima el directorio
-     * en el que quedó, de modo que `cd` persista entre llamadas.
+     * en el que quedó, de modo que `cd` persista entre llamadas. En Git Bash `$PWD` es una ruta POSIX
+     * (`/c/Users/...`) que Java no entiende; `pwd -W` devuelve la ruta Windows y en otros bash no existe.
      */
     fun wrap(command: String, cwd: Path): String = if (isPosix) {
         """
         |cd -- ${posixQuote(cwd.toString())} || exit 1
         |$command
         |__kc_rc=$?
-        |printf '\n%s%s\n' '$CWD_MARKER' "${'$'}PWD"
+        |printf '\n%s%s\n' '$CWD_MARKER' "${'$'}(pwd -W 2>/dev/null || pwd)"
         |exit ${'$'}__kc_rc
         """.trimMargin()
     } else {

@@ -42,7 +42,7 @@ class ReadTool : TypedTool<ReadInput>(ReadInput.serializer()) {
 
         val slice = lines.drop(offset - 1).take(limit)
         val out = StringBuilder()
-        slice.forEachIndexed { i, line -> out.append(String.format("%6d\t%s%n", offset + i, line)) }
+        slice.forEachIndexed { i, line -> out.append(String.format("%6d\t%s\n", offset + i, line)) } // siempre \n, nunca el separador de la plataforma
         val end = offset - 1 + slice.size
         if (end < lines.size) out.append("[... ${lines.size - end} líneas más; sigue con offset=${end + 1}]")
         ctx.ok(out.toString().trimEnd())
