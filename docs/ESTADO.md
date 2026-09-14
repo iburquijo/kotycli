@@ -4,7 +4,18 @@ Memoria de trabajo entre sesiones. Se actualiza al cerrar cada tramo de trabajo:
 
 ## Dónde estamos (2026-09-14)
 
-**v2 en marcha: hechos el punto 1 (tool `task` y subagentes) y el punto 2 (skills)**, en la rama `claude/v2-implementation-continue-hf4wc6`. Lo de abajo (v1) ya está en `main`.
+**v2 en marcha: hechos el punto 1 (tool `task` y subagentes) y el punto 2 (skills)**, más la tool `fetch` que quedaba de v1.1. Todo en la rama `claude/v2-implementation-continue-hf4wc6`, abierta en el [PR #3](https://github.com/iburquijo/kotycli/pull/3) y pendiente de revisión. Lo de abajo (v1) ya está en `main`.
+
+Tramo 1 (`task` y subagentes):
+
+- `agents/AgentType.kt` con los roles builtin `explorer` (solo lectura, con allowlist de `rg`, `git log`, `ls`… en `permissionRules`) e `implementor` (todo menos `task`).
+- `agents/AgentTypeLoader.kt`: roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`; gana proyecto > usuario > builtin.
+- `skills/Frontmatter.kt`: el parser de frontmatter plano, compartido con los skills.
+- `tools/TaskTool.kt`: otro `runLoop` con contexto virgen, mismo `Budget`, mismos interceptores, mismo `ToolEnv`; devuelve solo el último mensaje del hijo. Profundidad máxima 2 y `Semaphore` del padre.
+- `Tool.parallel` (por defecto `readOnly`) para que `task`, que no es de solo lectura, se ejecute en paralelo con otras llamadas de la misma ronda. El dispatcher particiona por ahí.
+- `AgentConfig.permissionRules`: reglas de permisos por agente, que `RulePolicy` suma a las globales. Formato `allow:bash(rg *)`.
+- `SystemPrompt.context()`: el bloque de entorno + `AGENTS.md` se separa del prompt base para dárselo al hijo junto al prompt de su rol.
+- Actualizados los docs 02, 03 y 04.
 
 Tramo 2 (skills):
 
@@ -19,17 +30,6 @@ Tramo 3 (tool `fetch`, lo que quedaba de v1.1):
 - `tools/FetchTool.kt`: GET sobre el `HttpClient` común, solo `http(s)`, timeout de 30 s y corte a 512 KB. El HTML vuelve como markdown (jsoup, quitando `script`, `style`, `nav`, `header`, `footer`…); el resto tal cual, y `raw: true` desactiva la conversión. Con esto el toolset de `explorer` ya existe entero.
 
 Además, arreglado un fallo de cancelación en `bash`: el lector de la salida era hijo del turn y un `read()` bloqueado no se interrumpe, así que si `ProcessHandle.descendants()` no ve a los nietos (pasa en contenedores sin `/proc` completo) el nieto mantenía el pipe abierto y Ctrl+C tardaba lo que tardase el comando. Ahora el lector va en su propio scope y se abandona al cancelar. Eso era el test flaky de `BashToolTest`.
-
-Tramo 1 (`task` y subagentes):
-
-- `agents/AgentType.kt` con los roles builtin `explorer` (solo lectura, con allowlist de `rg`, `git log`, `ls`… en `permissionRules`) e `implementor` (todo menos `task`).
-- `agents/AgentTypeLoader.kt`: roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`; gana proyecto > usuario > builtin.
-- `skills/Frontmatter.kt`: el parser de frontmatter plano, compartido con los skills.
-- `tools/TaskTool.kt`: otro `runLoop` con contexto virgen, mismo `Budget`, mismos interceptores, mismo `ToolEnv`; devuelve solo el último mensaje del hijo. Profundidad máxima 2 y `Semaphore` del padre.
-- `Tool.parallel` (por defecto `readOnly`) para que `task`, que no es de solo lectura, se ejecute en paralelo con otras llamadas de la misma ronda. El dispatcher particiona por ahí.
-- `AgentConfig.permissionRules`: reglas de permisos por agente, que `RulePolicy` suma a las globales. Formato `allow:bash(rg *)`.
-- `SystemPrompt.context()`: el bloque de entorno + `AGENTS.md` se separa del prompt base para dárselo al hijo junto al prompt de su rol.
-- Actualizados los docs 02, 03 y 04.
 
 49 tests en total (15 nuevos), verde cinco veces seguidas.
 
