@@ -53,7 +53,8 @@ El primero que se implementa, porque es el entorno de desarrollo (Ollama en casa
   - Los tool results van como mensajes `role: tool` individuales. `toWire` expande nuestro único mensaje `USER` con N `ToolResult` en N mensajes `tool`; `fromWire` hace la inversa.
   - Los argumentos de tool llegan en fragmentos de JSON por SSE que hay que acumular por `index` hasta `finish_reason`.
   - `finish_reason`: `stop` -> `END_TURN`, `tool_calls` -> `TOOL_USE`, `length` -> `MAX_TOKENS`, `content_filter` -> `REFUSAL`.
-  - `reasoning_content` u otros campos no estándar se guardan como `Opaque`.
+  - El razonamiento y otros campos no estándar se guardan como `Opaque` y vuelven al proveedor con el mismo nombre con el que llegaron:
+    `reasoning_content` en DeepSeek y vLLM, `reasoning` en OpenRouter.
 - `Capabilities` se leen de la configuración por modelo, porque varían entre servidores.
 
 ### `copilot`: GitHub Copilot

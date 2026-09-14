@@ -9,6 +9,7 @@ import com.softbenur.kotycli.json
 import com.softbenur.kotycli.providers.openai.OpenAiWire
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -110,5 +111,56 @@ class OpenAiWireTest {
         assertEquals(StopReason.TOOL_USE, completion.stopReason)
         assertEquals("ls", completion.message.toolUses.single().input["command"]!!.jsonPrimitive.content)
         assertEquals(7, completion.usage.total)
+    }
+
+    @Test
+    fun `readSse guarda el razonamiento venga como reasoning o como reasoning_content`() = runTest {
+        suspend fun opaque(sse: String): JsonObject {
+            var done: StreamEvent.Done? = null
+            wire.readSse(sse.trimIndent().byteInputStream()) { if (it is StreamEvent.Done) done = it }
+            val block = done!!.completion.message.content.filterIsInstance<Block.Opaque>().single()
+            assertEquals("openai", block.providerId)
+            return block.payload.jsonObject
+        }
+
+        // OpenRouter: `reasoning` en cada delta, `reasoning_details` que no usamos y un `null` al cerrar.
+        val openrouter = opaque("""
+            data: {"choices":[{"index":0,"delta":{"content":"","reasoning":"Hay que ","reasoning_details":[{"type":"reasoning.text","text":"Hay que ","index":0}]},"finish_reason":null}]}
+
+            data: {"choices":[{"index":0,"delta":{"content":"","reasoning":"mirar el csv"},"finish_reason":null}]}
+
+            data: {"choices":[{"index":0,"delta":{"content":"vale","reasoning":null},"finish_reason":"stop"}]}
+
+            data: [DONE]
+        """)
+        assertEquals("Hay que mirar el csv", openrouter["reasoning"]!!.jsonPrimitive.content)
+        assertTrue("reasoning_content" !in openrouter)
+
+        // DeepSeek y vLLM: el nombre de siempre.
+        val deepseek = opaque("""
+            data: {"choices":[{"index":0,"delta":{"reasoning_content":"pensando"},"finish_reason":"stop"}]}
+        """)
+        assertEquals("pensando", deepseek["reasoning_content"]!!.jsonPrimitive.content)
+        assertTrue("reasoning" !in deepseek)
+    }
+
+    @Test
+    fun `el razonamiento vuelve al proveedor con el nombre con el que llego`() {
+        val opaque = Block.Opaque("openai", buildJsonObject { put("reasoning", "pensando") })
+        val request = Request(
+            model = "m", system = "sys", maxTokens = 100, tools = emptyList(),
+            messages = listOf(Message(Role.ASSISTANT, listOf(Block.Text("vale"), opaque))),
+        )
+        val assistant = wire.toWire(request)["messages"]!!.jsonArray[1].jsonObject
+        assertEquals("pensando", assistant["reasoning"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `respuesta no streaming con reasoning lo guarda como opaco`() {
+        val body = Json.parseToJsonElement("""
+            {"choices":[{"message":{"role":"assistant","content":"hecho","reasoning":"pensando"},"finish_reason":"stop"}]}
+        """).jsonObject
+        val block = wire.fromWireNonStreaming(body).message.content.filterIsInstance<Block.Opaque>().single()
+        assertEquals("pensando", block.payload.jsonObject["reasoning"]!!.jsonPrimitive.content)
     }
 }

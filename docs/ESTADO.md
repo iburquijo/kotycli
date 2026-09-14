@@ -33,7 +33,7 @@ Además, arreglado un fallo de cancelación en `bash`: el lector de la salida er
 
 49 tests en total (15 nuevos), verde cinco veces seguidas.
 
-Pendiente antes de fiarse: nadie ha visto todavía un subagente ni un skill contra un proveedor real, solo contra el `FakeProvider`.
+Pendiente antes de fiarse: nadie ha visto todavía un subagente ni un skill contra un proveedor real, solo contra el `FakeProvider`. Para eso ya hay endpoint: [OpenRouter con `nvidia/nemotron-3.5-lightning:free`](#openrouter-con-nvidianemotron-35-lightningfree-probado), gratis y con `tools`, que da de sobra para pruebas básicas.
 
 ## v1 (ya en main)
 
@@ -60,12 +60,28 @@ Verificado:
 - Build limpio y tests en verde en Linux.
 - Prueba end-to-end contra un servidor HTTP falso que habla el wire OpenAI por SSE: un turn con `bash` -> `read` -> `edit` encadenados, cada `ToolResult` vuelve como `role: tool`, el fichero cambia en disco.
 - `kotycli doctor` contra ese servidor. `--plain` sin TTY resuelve los `Ask` como `Deny`. La TUI arranca sin TTY.
+- **Un proveedor real: OpenRouter** (2026-09-14, ver más abajo). Deja de ser cierto que el harness no haya hablado nunca con un modelo de verdad.
 
 No verificado:
 
-- **Ningún proveedor real.** Ni Ollama, ni un gateway corporativo, ni Anthropic. Es lo primero que hay que hacer antes de fiarse.
+- **El resto de proveedores.** Ni Ollama en local, ni un gateway corporativo, ni Anthropic. OpenRouter no dice nada de esos tres.
 - Windows: CI compila y pasa tests allí, pero nadie ha ejecutado la TUI en Windows Terminal ni el truststore `Windows-ROOT` con un proxy inspector de verdad.
 - Cancelación con Ctrl+C en la TUI real (está implementada, no probada a mano).
+
+### OpenRouter con `nvidia/nemotron-3.5-lightning:free` (probado)
+
+El primer proveedor real contra el que ha corrido el agente. El adaptador `openai` vale tal cual:
+
+```json
+{ "provider": "openrouter",
+  "providers": { "openrouter": { "type": "openai", "baseUrl": "https://openrouter.ai/api/v1",
+                                 "model": "nvidia/nemotron-3.5-lightning:free", "apiKeyEnv": "OPENROUTER_TOKEN",
+                                 "contextWindow": 1000000, "maxOutputTokens": 8192 } } }
+```
+
+Qué se comprobó: `doctor` devuelve 200 (ojo, `GET /models` de OpenRouter responde **sin autenticar**, así que un doctor verde no prueba que la clave sirva); un turn completo con `read` -> `create` encadenadas escribe el fichero correcto; los `tool_call_id` vuelven bien como `role: tool`; y `usage` llega con `prompt_tokens`/`completion_tokens`, o sea que el `Budget` cuenta. El modelo declara `tools` en `supported_parameters`, 1M de contexto y 65.536 de salida.
+
+Avisos del wire de OpenRouter: manda keep-alives `: OPENROUTER PROCESSING` (los ignora `readSse`), y el razonamiento viaja en `reasoning`, no en `reasoning_content` (arreglado, ver abajo). El tier gratuito va justo de cuota y da algún `504 Upstream idle timeout` en horas de carga; reintentar basta.
 
 ### Probar con la API de Anthropic sin escribir el adaptador nativo
 
@@ -87,6 +103,7 @@ Avisos: `kotycli doctor` hace `GET {baseUrl}/models`, que es la API nativa y pue
 - `Tool.execute` recibe un `ToolContext(agent, callId)` con `ok()`/`error()`; el doc 03 describía `ToolContext` con los campos de `ToolEnv`, que ahora vive en `AgentContext.env`.
 - `ToolDefinition` está en `core/` porque la usan `tools/` y `providers/` y la regla es que `tools` no dependa de `providers`.
 - Paquete raíz `com.softbenur.kotycli` (dominio del autor).
+- El razonamiento se guarda con el nombre que le da cada gateway (`reasoning_content` en DeepSeek y vLLM, `reasoning` en OpenRouter) y se devuelve con ese mismo nombre. Antes solo se miraba `reasoning_content` y con OpenRouter se perdía entero. No se guardan los `reasoning_details` estructurados: hoy ningún modelo probado los necesita para encadenar tool calls, y reconstruirlos desde los deltas es otro tramo. Medido: el eco del razonamiento son +93 tokens de entrada en una conversación de tres iteraciones, sin cambio apreciable de latencia.
 - `bash` ejecuta el script desde un fichero temporal, no como argumento de `-c`: Java en Windows no escapa las comillas dobles dentro de un argumento y `bash.exe` cortaba el script en la primera. Descubierto por el CI de Windows.
 
 ## Siguiente sesión: seguir la v2
