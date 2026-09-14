@@ -3,21 +3,32 @@ package com.softbenur.kotycli.frontend
 import com.softbenur.kotycli.core.AgentContext
 import com.softbenur.kotycli.core.AgentEvent
 import com.softbenur.kotycli.core.PermissionReply
+import com.softbenur.kotycli.core.runLoop
 import com.softbenur.kotycli.skills.SkillCatalog
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Trozos que comparten la TUI y `--plain`: cómo resumir en una línea una tool call y su resultado. */
 object Render {
-    fun toolLine(event: AgentEvent.ToolStart): String {
-        val input = event.call.input
-        val subject = when (event.call.name) {
-            "bash" -> input.str("description")?.let { "$it  ·  ${input.str("command").orEmpty()}" } ?: input.str("command").orEmpty()
-            "read", "edit", "create" -> input.str("path").orEmpty()
-            else -> input.toString()
-        }
-        return "● ${event.call.name}  ${subject.lineSequence().first().take(160)}"
+    /** El campo del input que identifica la llamada para el usuario. Lo usan las tres frontends. */
+    fun toolSubject(name: String, input: JsonObject): String = when (name) {
+        "bash" -> input.str("description")?.let { "$it  ·  ${input.str("command").orEmpty()}" } ?: input.str("command").orEmpty()
+        "read", "edit", "create" -> input.str("path").orEmpty()
+        "fetch" -> input.str("url").orEmpty()
+        "task" -> input.str("description") ?: input.str("prompt").orEmpty()
+        else -> input.toString()
     }
+
+    /** Una línea: `bash  compila y pasa los tests · ./gradlew build`. Sin adornos, para reutilizarla en ACP. */
+    fun toolTitle(name: String, input: JsonObject, max: Int = 160): String {
+        val subject = toolSubject(name, input).lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim()
+        return if (subject.isEmpty()) name else "$name  ${subject.take(max)}"
+    }
+
+    fun toolLine(event: AgentEvent.ToolStart): String = "● " + toolTitle(event.call.name, event.call.input)
 
     fun resultLine(event: AgentEvent.ToolEnd): String {
         val content = event.result.content.trim()
@@ -61,6 +72,24 @@ interface Session {
     val skills: SkillCatalog get() = SkillCatalog(emptyList())
     suspend fun turn(prompt: String)
     fun cancel()
+}
+
+/** La `Session` que montan los tres frontends: un `runLoop` por turn, cancelable desde fuera. */
+class LoopSession(
+    override val root: AgentContext,
+    override val skills: SkillCatalog = SkillCatalog(emptyList()),
+) : Session {
+    private var current: Job? = null
+
+    override suspend fun turn(prompt: String) = coroutineScope {
+        val job = launch { runLoop(root, prompt) }
+        current = job
+        job.join()
+    }
+
+    override fun cancel() {
+        current?.cancel()
+    }
 }
 
 fun parseReply(line: String?): PermissionReply = when (line?.trim()) {

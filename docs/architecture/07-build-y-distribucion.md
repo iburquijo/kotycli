@@ -72,10 +72,12 @@ src/main/kotlin/com/softbenur/kotycli/
   config/
     Config.kt                  # carga ~/.kotycli + .kotycli, merge, env; skills y agentes de ~/.agents + .agents
   frontend/
-    Frontend.kt                # Session (lo que un frontend manda al core) y Render (resúmenes de una línea)
+    Frontend.kt                # Session, LoopSession y Render (resúmenes de una línea)
     tui/Tui.kt                 # append-only, JLine, comandos /, pager
     plain/Plain.kt             # sin ANSI, sin raw mode
-    acp/Acp.kt                 # JSON-RPC por stdio
+    acp/JsonRpc.kt             # JSON-RPC 2.0 por líneas, en los dos sentidos
+    acp/AcpWire.kt             # traducción pura AgentEvent <-> wire de ACP
+    acp/Acp.kt                 # sesiones, session/prompt, session/cancel, permisos
   prompt/
     SystemPrompt.kt            # ensambla: base + AGENTS.md + lista de skills + entorno (shell, OS, cwd)
 ```

@@ -23,6 +23,16 @@ class ArchitectureTest {
         assertTrue(offenders.isEmpty(), "println fuera de frontend/: $offenders")
     }
 
+    /** ADR 0010: en ACP stdout es del protocolo, así que ahí la regla es aún más estricta que en el resto. */
+    @Test
+    fun `el frontend ACP tampoco imprime`() {
+        val offenders = sources.filter { p ->
+            val rel = p.relativeTo(root).toString().replace('\\', '/')
+            rel.startsWith("frontend/acp") && Regex("""\bprintln?\(""").containsMatchIn(p.readText())
+        }
+        assertTrue(offenders.isEmpty(), "println en frontend/acp: stdout es del protocolo: $offenders")
+    }
+
     @Test
     fun `los tipos de wire de un proveedor no salen de su paquete`() {
         val offenders = sources.filter { p ->
