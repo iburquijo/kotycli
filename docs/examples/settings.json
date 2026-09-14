@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": ["bash(git status*)", "bash(git diff*)", "bash(git log*)", "bash(rg *)", "bash(ls*)", "bash(./gradlew *)"],
+    "ask": ["bash(git push*)"],
+    "deny": ["bash(rm -rf *)", "bash(git push --force*)", "bash(git reset --hard*)"]
+  }
+}

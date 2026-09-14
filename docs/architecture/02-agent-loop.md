@@ -176,16 +176,21 @@ sealed interface AgentEvent {
     data class TextDelta(override val agentId: String, val text: String) : AgentEvent
     data class AssistantMessage(override val agentId: String, val message: Message) : AgentEvent
     data class ToolStart(override val agentId: String, val call: ToolUse) : AgentEvent
-    data class ToolEnd(override val agentId: String, val result: ToolResult, val durationMs: Long) : AgentEvent
-    data class PermissionAsk(override val agentId: String, val tool: Tool, val input: JsonObject, val reply: CompletableDeferred<PermissionReply>) : AgentEvent
+    data class ToolEnd(override val agentId: String, val call: ToolUse, val result: ToolResult, val durationMs: Long) : AgentEvent
+    data class PermissionAsk(override val agentId: String, val toolName: String, val input: JsonObject, val subject: String, val reply: CompletableDeferred<PermissionReply>) : AgentEvent
     data class SubagentStart(override val agentId: String, val parentId: String, val agentType: String, val prompt: String) : AgentEvent
     data class SubagentEnd(override val agentId: String, val tokensBurned: Int, val tokensReturned: Int) : AgentEvent
     data class Compacted(override val agentId: String, val before: Int, val after: Int) : AgentEvent
     data class UsageUpdate(override val agentId: String, val usage: Usage) : AgentEvent
     data class BudgetExceeded(override val agentId: String, val what: String) : AgentEvent
     data class Refusal(override val agentId: String) : AgentEvent
+    /** El proveedor falló (red, 4xx/5xx, wire ilegible). El turn termina; el historial queda como estaba. */
+    data class Failed(override val agentId: String, val message: String) : AgentEvent
+    data class TurnEnd(override val agentId: String, val usage: Usage, val durationMs: Long) : AgentEvent
 }
 ```
+
+`Failed` y `TurnEnd` no estaban en el borrador: un error de proveedor no puede ser una excepción que tumbe el frontend, y el separador de fin de turn necesita saber cuándo acaba el turn sin que el frontend inspeccione el historial.
 
 `PermissionAsk` lleva un `CompletableDeferred`: el frontend lo completa cuando el usuario responde. En `--plain` sin TTY o sin frontend suscrito, se completa con `Deny` tras el timeout.
 

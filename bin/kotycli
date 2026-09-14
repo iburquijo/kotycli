@@ -1,0 +1,4 @@
+#!/bin/sh
+# Lanzador de una línea para el PATH. Espera el jar al lado de este script o en KOTYCLI_JAR.
+JAR="${KOTYCLI_JAR:-$(dirname "$0")/kotycli.jar}"
+exec java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstdin.encoding=UTF-8 -jar "$JAR" "$@"

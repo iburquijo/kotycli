@@ -5,7 +5,7 @@
 - **JDK 21** (LTS). Lo que hay en cualquier máquina corporativa, Windows incluido.
 - **Kotlin 2.x**, Gradle con Kotlin DSL, wrapper commiteado.
 - **Shadow plugin** (`com.gradleup.shadow`) para el fat jar. `./gradlew shadowJar` produce `build/libs/kotycli.jar` con `Main-Class` en el manifest.
-- Arranque: `java -jar kotycli.jar`, más un `kotycli.cmd` y un `kotycli` de una línea para el PATH. Si el arranque de la JVM molesta, AppCDS primero y GraalVM native-image después, pero no es prioridad.
+- Arranque: `java -jar kotycli.jar`, más `bin/kotycli.cmd` y `bin/kotycli` de una línea para el PATH. `main` fuerza stdout a UTF-8 si la JVM no lo trae. Si el arranque de la JVM molesta, AppCDS primero y GraalVM native-image después, pero no es prioridad.
 
 ## Dependencias
 
@@ -40,7 +40,10 @@ src/main/kotlin/dev/kotycli/
     AgentEvent.kt
     Budget.kt
   tools/
-    Tool.kt                    # interfaz, ToolRegistry, ToolContext, FileTracker, @Description, SchemaGen
+    Tool.kt                    # interfaz, TypedTool, ToolRegistry, ToolEnv, ToolContext, @Description
+    SchemaGen.kt               # JSON Schema desde el SerialDescriptor
+    FileTracker.kt
+    Shell.kt                   # detección del shell y envoltura del comando (cwd persistente)
     BashTool.kt
     ReadTool.kt
     EditTool.kt
@@ -59,8 +62,9 @@ src/main/kotlin/dev/kotycli/
     AgentType.kt
     AgentTypeLoader.kt
   providers/
-    Provider.kt                # interfaz, Request, Capabilities, StreamEvent
-    openai/OpenAiProvider.kt   # wire /chat/completions + SSE
+    Provider.kt                # interfaz, Request, Capabilities, StreamEvent, CompletionAccumulator
+    Providers.kt               # fábrica desde la config: el único sitio que conoce los adaptadores
+    openai/OpenAiProvider.kt   # wire /chat/completions + SSE (OpenAiWire es la traducción pura)
     copilot/CopilotAuth.kt     # device flow, token exchange, headers
     anthropic/                 # opcional, después
   http/
@@ -68,6 +72,7 @@ src/main/kotlin/dev/kotycli/
   config/
     Config.kt                  # carga ~/.kotycli + .kotycli, merge, env; skills y agentes de ~/.agents + .agents
   frontend/
+    Frontend.kt                # Session (lo que un frontend manda al core) y Render (resúmenes de una línea)
     tui/Tui.kt                 # append-only, JLine, comandos /, pager
     plain/Plain.kt             # sin ANSI, sin raw mode
     acp/Acp.kt                 # JSON-RPC por stdio
