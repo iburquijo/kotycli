@@ -54,7 +54,7 @@ El usuario también puede invocar un skill explícitamente con `/nombre argument
 
 ## Instrucciones de proyecto: `KOTYCLI.md`
 
-Un fichero `KOTYCLI.md` en la raíz del proyecto (y `~/.agents/KOTYCLI.md` para el usuario) se inyecta siempre al system prompt. Es el sitio para convenciones del repo, comandos de build y el shell que hay debajo de `bash`. Se mantiene corto: todo lo que se pueda mover a un skill, se mueve.
+Un fichero `KOTYCLI.md` en la raíz del proyecto (y `~/.kotycli/KOTYCLI.md` para el usuario) se inyecta siempre al system prompt. Es el sitio para convenciones del repo, comandos de build y el shell que hay debajo de `bash`. Se mantiene corto: todo lo que se pueda mover a un skill, se mueve.
 
 ## Caché
 

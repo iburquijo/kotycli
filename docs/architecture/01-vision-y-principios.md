@@ -42,5 +42,5 @@ Todo lo que no falle en manos de otros (el editor, el terminal, el modelo, el cl
 6. **Todo cancelable.** Coroutines de arriba abajo. Ctrl+C mata la llamada al modelo en curso, los procesos hijos y los subagentes.
 7. **Presupuestos explícitos.** Máximo de iteraciones por turn, de tokens por sesión, de tiempo por comando y de profundidad de subagentes.
 8. **Un `HttpClient` para todo.** Truststore corporativo y proxy resueltos una vez, en un sitio. Proveedores y `fetch` lo heredan.
-9. **Configuración en ficheros, no en código.** Proveedor, modelo, permisos y rutas de skills se leen de `~/.agents/` y de `.agents/` en el proyecto.
+9. **Configuración en ficheros, no en código.** Proveedor, modelo y permisos se leen de `~/.kotycli/` y de `.kotycli/` en el proyecto. Skills y agentes viven en `.agents/` (`~/.agents/` y `<repo>/.agents/`), el directorio estándar de Agent Skills, para que sean compartibles con otros harnesses.
 10. **Un módulo hasta que duela.**

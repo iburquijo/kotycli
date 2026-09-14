@@ -60,7 +60,7 @@ El primero que se implementa, porque es el entorno de desarrollo (Ollama en casa
 
 Mismo wire OpenAI-compatible, con tres cosas encima:
 
-1. **Device flow OAuth** con el client ID de VS Code para obtener el token de GitHub. Se guarda en `~/.agents/auth/github.json`.
+1. **Device flow OAuth** con el client ID de VS Code para obtener el token de GitHub. Se guarda en `~/.kotycli/auth/github.json`.
 2. **Exchange** de ese token por un token corto de Copilot (`/copilot_internal/v2/token`), con caché y refresco automático antes de que caduque.
 3. **Headers** `Editor-Version`, `Editor-Plugin-Version` y `Copilot-Integration-Id`, sin los cuales el endpoint rechaza la petición.
 
@@ -74,7 +74,7 @@ Tercero, para quien tenga clave directa. SDK Java oficial (`com.anthropic:anthro
 
 ## Configuración
 
-`~/.agents/config.json`, con override en `.agents/config.json` del proyecto:
+`~/.kotycli/config.json`, con override en `.kotycli/config.json` del proyecto:
 
 ```json
 {

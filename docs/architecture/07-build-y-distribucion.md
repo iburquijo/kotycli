@@ -21,7 +21,7 @@ Pocas y aburridas:
 | HTML a markdown en `fetch` | `jsoup` | Maduro, sin dependencias transitivas |
 | YAML de frontmatter | parser propio mínimo | El frontmatter es `clave: valor` plano |
 | Tests | JUnit 5 + `kotlinx-coroutines-test` | Estándar |
-| Logs | `slf4j` + `logback` a fichero (`~/.agents/logs/`) | Nunca a stdout, que es del frontend (y en ACP, del protocolo) |
+| Logs | `slf4j` + `logback` a fichero (`~/.kotycli/logs/`) | Nunca a stdout, que es del frontend (y en ACP, del protocolo) |
 
 Cosas que **no** entran: Spring, frameworks de DI, Jackson, frameworks de TUI de pantalla completa, librerías de "agentes" que impongan su propio loop, SDKs de proveedor salvo que el adaptador `anthropic` lo justifique.
 
@@ -66,7 +66,7 @@ src/main/kotlin/dev/kotycli/
   http/
     Http.kt                    # el único HttpClient: truststore, proxy, timeouts
   config/
-    Config.kt                  # carga ~/.agents + .agents, merge, env
+    Config.kt                  # carga ~/.kotycli + .kotycli, merge, env; skills y agentes de ~/.agents + .agents
   frontend/
     tui/Tui.kt                 # append-only, JLine, comandos /, pager
     plain/Plain.kt             # sin ANSI, sin raw mode
@@ -88,20 +88,25 @@ nadie fuera de providers/<x> -> tipos de wire de <x>
 
 ## Ficheros en disco
 
+Dos raíces con responsabilidades distintas: `.kotycli/` es configuración y estado del harness; `.agents/` es el directorio estándar de Agent Skills, compartible con otros harnesses.
+
 ```
-~/.agents/
+~/.kotycli/
   config.json
   settings.json          # reglas de permisos persistidas
   auth/github.json       # token de device flow (solo Copilot)
   KOTYCLI.md
-  skills/
-  agents/
   logs/                  # app.log, tools.jsonl
   sessions/<id>.jsonl    # historial serializado, para --resume (después)
 
-<repo>/.agents/
+~/.agents/
+  skills/<nombre>/SKILL.md
+  agents/<rol>.md
+
+<repo>/.kotycli/
   config.json            # override por proyecto
   settings.json
+<repo>/.agents/
   skills/
   agents/
 <repo>/KOTYCLI.md
