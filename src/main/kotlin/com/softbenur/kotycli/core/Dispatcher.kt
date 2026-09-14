@@ -9,12 +9,12 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
 
 /**
- * Ejecuta una ronda de tool calls. Las `readOnly` en paralelo, las demás en serie y en el orden
- * que las pidió el modelo. El orden de los resultados sigue siempre el orden de las llamadas.
+ * Ejecuta una ronda de tool calls. Las paralelizables (`readOnly` y `task`) a la vez, las demás en serie
+ * y en el orden que las pidió el modelo. El orden de los resultados sigue siempre el orden de las llamadas.
  */
 suspend fun dispatch(ctx: AgentContext, calls: List<Block.ToolUse>): List<Block.ToolResult> = coroutineScope {
-    val (readOnly, mutating) = calls.partition { ctx.tools[it.name]?.readOnly == true }
-    val parallel = readOnly.map { async { runOne(ctx, it) } }
+    val (concurrent, mutating) = calls.partition { ctx.tools[it.name]?.parallel == true }
+    val parallel = concurrent.map { async { runOne(ctx, it) } }
     val serial = mutating.map { runOne(ctx, it) }
     (parallel.awaitAll() + serial).sortedBy { r -> calls.indexOfFirst { it.id == r.toolUseId } }
 }

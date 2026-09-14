@@ -4,7 +4,26 @@ Memoria de trabajo entre sesiones. Se actualiza al cerrar cada tramo de trabajo:
 
 ## Dónde estamos (2026-09-14)
 
-**v1 del roadmap implementada** (`docs/architecture/07-build-y-distribucion.md`, sección Roadmap), en la rama `claude/kotycli-repo-structure-hfxqoh`, pendiente de merge a `main`.
+**v2 en marcha: el punto 1 (tool `task` y subagentes) está hecho**, en la rama `claude/v2-implementation-continue-hf4wc6`. Lo de abajo (v1) ya está en `main`.
+
+Lo que ha entrado en este tramo:
+
+- `agents/AgentType.kt` con los roles builtin `explorer` (solo lectura, con allowlist de `rg`, `git log`, `ls`… en `permissionRules`) e `implementor` (todo menos `task`).
+- `agents/AgentTypeLoader.kt`: roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`; gana proyecto > usuario > builtin.
+- `skills/Frontmatter.kt`: el parser de frontmatter plano, que reutilizarán los skills (punto 2).
+- `tools/TaskTool.kt`: otro `runLoop` con contexto virgen, mismo `Budget`, mismos interceptores, mismo `ToolEnv`; devuelve solo el último mensaje del hijo. Profundidad máxima 2 y `Semaphore` del padre.
+- `Tool.parallel` (por defecto `readOnly`) para que `task`, que no es de solo lectura, se ejecute en paralelo con otras llamadas de la misma ronda. El dispatcher particiona por ahí.
+- `AgentConfig.permissionRules`: reglas de permisos por agente, que `RulePolicy` suma a las globales. Formato `allow:bash(rg *)`.
+- `SystemPrompt.context()`: el bloque de entorno + `AGENTS.md` se separa del prompt base para dárselo al hijo junto al prompt de su rol.
+- 8 tests nuevos (42 en total). Actualizados los docs 02, 03 y 04.
+
+Pendiente antes de fiarse: nadie ha visto todavía un subagente contra un proveedor real, solo contra el `FakeProvider`.
+
+**Ojo con un test flaky**: `BashToolTest.cancelar mata el proceso y no deja el script temporal` falla de vez en cuando en máquinas cargadas (espera cancelar en <10 s y a veces se come los 30 s del `sleep`). Se reproduce también sin estos cambios; está sin investigar.
+
+## v1 (ya en main)
+
+**v1 del roadmap implementada** (`docs/architecture/07-build-y-distribucion.md`, sección Roadmap) y mergeada a `main` en el PR #2.
 
 Lo que hay:
 
@@ -56,7 +75,7 @@ Avisos: `kotycli doctor` hace `GET {baseUrl}/models`, que es la API nativa y pue
 - Paquete raíz `com.softbenur.kotycli` (dominio del autor).
 - `bash` ejecuta el script desde un fichero temporal, no como argumento de `-c`: Java en Windows no escapa las comillas dobles dentro de un argumento y `bash.exe` cortaba el script en la primera. Descubierto por el CI de Windows.
 
-## Siguiente sesión: empezar la v2
+## Siguiente sesión: seguir la v2
 
 Lo que queda de v1.1 es pequeño y se puede hacer al entrar en v2 o intercalado:
 
@@ -65,16 +84,16 @@ Lo que queda de v1.1 es pequeño y se puede hacer al entrar en v2 o intercalado:
 
 v2 según el roadmap:
 
-1. **Tool `task` y subagentes** (`04-subagentes.md`): `AgentType`, roles builtin `explorer` e `implementor`, `ToolRegistry.restrictedTo`, mismo `Budget`, `Semaphore` (ya está en `AgentContext.subagentSemaphore`), profundidad 2, eventos `SubagentStart`/`SubagentEnd` (ya existen y los frontends ya los pintan). Roles propios en `.agents/agents/*.md`.
+1. ~~**Tool `task` y subagentes**~~ hecho en este tramo.
 2. **Skills** (`05-skills.md`): `SkillLoader` sobre `.agents/skills/` y `~/.agents/skills/`, parser de frontmatter plano, lista `nombre — descripción — ruta` en el system prompt, `/nombre args` en la TUI. Reutilizar el mismo parser para los roles de subagente.
 3. **Proveedor `copilot`** (`06-proveedores.md`, ADR 0012): `OpenAiProvider` con un `Authenticator` que hace device flow, exchange de token y cabeceras `Editor-Version`/`Copilot-Integration-Id`. Token en `~/.kotycli/auth/github.json`. Tests contra fixtures, nunca contra la API real.
 
-Orden sugerido: `task` primero (es lo que más valor da y ya tiene medio cableado en el core), skills después, Copilot cuando haya acceso para probarlo. Cada tramo termina con tests y con esta nota actualizada.
+Siguiente: skills (el parser de frontmatter ya está, falta `SkillLoader`, la lista en el system prompt y `/nombre args` en la TUI) y después Copilot, cuando haya acceso para probarlo. La tool `fetch` conviene hacerla pronto: el toolset de `explorer` ya la nombra y todavía no existe. Cada tramo termina con tests y con esta nota actualizada.
 
 ## Cómo retomar
 
 ```
-git fetch origin && git checkout claude/kotycli-repo-structure-hfxqoh   # o main si ya está mergeado
+git fetch origin && git checkout claude/v2-implementation-continue-hf4wc6
 ./gradlew build
 ```
 

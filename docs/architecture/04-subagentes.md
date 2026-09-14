@@ -19,8 +19,9 @@ data class AgentType(
     val description: String,           // cuándo usarlo; esto lo ve el modelo padre
     val systemPrompt: String,
     val tools: Set<String>,            // toolset del rol
-    val model: String? = null,         // null => el del padre
+    val model: String? = null,         // null => `subagentModel` de la config, o el del padre
     val maxIterations: Int = 30,
+    val permissionRules: List<String> = emptyList(),   // "allow:bash(rg *)"; se suman a las del padre, nunca las relajan
 )
 ```
 
@@ -28,10 +29,10 @@ Roles builtin:
 
 | Rol | Toolset | Para qué |
 |-----|---------|----------|
-| `explorer` | `read`, `fetch`, `bash` (bajo política de solo lectura: allowlist de `rg`, `fd`, `git log`, `ls`, `cat`) | Localizar código, responder "dónde está X" |
+| `explorer` | `read`, `fetch`, `bash` con una allowlist de comandos de solo lectura (`rg`, `fd`, `ls`, `cat`, `git log`…) en `permissionRules`; lo que no esté en ella sigue pidiendo permiso | Localizar código, responder "dónde está X" |
 | `implementor` | Todo menos `task` | Cambios acotados y bien especificados |
 
-Roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`: markdown con frontmatter (`name`, `description`, `tools`, `model`) y el system prompt como cuerpo. Mismo formato que los skills para tener un solo parser.
+Roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`: markdown con frontmatter (`name`, `description`, `tools`, `model`, `maxIterations`, `permissions`) y el system prompt como cuerpo. Mismo formato que los skills para tener un solo parser (`skills/Frontmatter.kt`). Gana el más específico: proyecto > usuario > builtin; un rol sin `description` o sin cuerpo se ignora.
 
 ## La tool `task`
 
@@ -39,6 +40,7 @@ Roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`: markdown con f
 class TaskTool(private val types: Map<String, AgentType>) : Tool {
     override val name = "task"
     override val readOnly = false     // conservador; la sesión hija puede mutar
+    override val parallel = true      // pero varios `task` de la misma ronda sí corren a la vez
     // input: { "agent_type": "explorer", "prompt": "...", "description": "..." }
 
     override suspend fun execute(input: JsonObject, ctx: ToolContext): ToolResult {
@@ -48,8 +50,9 @@ class TaskTool(private val types: Map<String, AgentType>) : Tool {
 
         val child = AgentContext(
             id = newId(), depth = parent.depth + 1,
-            config = parent.config.copy(model = type.model ?: parent.config.model, maxIterationsPerTurn = type.maxIterations, systemPrompt = type.systemPrompt),
-            provider = parent.providerFor(type.model),
+            // El prompt del rol más el bloque de entorno y `AGENTS.md`: el hijo no hereda el prompt del padre pero sí dónde está.
+            config = parent.config.copy(model = type.model ?: subagentModel ?: parent.config.model, maxIterationsPerTurn = type.maxIterations, systemPrompt = type.systemPrompt + contextPrompt),
+            provider = parent.provider,                  // el modelo se cambia por config; el endpoint es el mismo
             tools = parent.tools.restrictedTo(type.tools),
             interceptors = parent.interceptors,          // misma política, mismo log
             budget = parent.budget,                      // los tokens del hijo se descuentan del padre

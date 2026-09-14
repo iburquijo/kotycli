@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
+import com.softbenur.kotycli.agents.AgentTypeLoader
 import com.softbenur.kotycli.config.Config
 import com.softbenur.kotycli.config.ConfigFile
 import com.softbenur.kotycli.config.Dirs
@@ -34,6 +35,7 @@ import com.softbenur.kotycli.tools.CreateTool
 import com.softbenur.kotycli.tools.EditTool
 import com.softbenur.kotycli.tools.ReadTool
 import com.softbenur.kotycli.tools.Shell
+import com.softbenur.kotycli.tools.TaskTool
 import com.softbenur.kotycli.tools.ToolEnv
 import com.softbenur.kotycli.tools.ToolRegistry
 import kotlinx.coroutines.Job
@@ -110,7 +112,12 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
     fun session(): Session {
         val provider = Providers.build(config.providerName, config.provider, http)
         val env = ToolEnv(workDir = workDir, http = http, shell = shell, allowedPaths = allowedPaths)
-        val tools = ToolRegistry(listOf(BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool()))
+        val agentTypes = AgentTypeLoader.load(config.dirs)
+        val contextPrompt = SystemPrompt.context(config.dirs, shell, workDir)
+        val tools = ToolRegistry(listOf(
+            BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool(),
+            TaskTool(agentTypes, contextPrompt, config.file.subagentModel),
+        ))
         val policy = RulePolicy(config.settings.rules())
         val interceptors = listOf(PathGuard(), Permissions(policy), ToolLog(config.dirs.logsDir.resolve("tools.jsonl")), Truncate())
         val agentConfig = AgentConfig(

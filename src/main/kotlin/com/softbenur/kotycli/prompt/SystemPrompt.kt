@@ -8,15 +8,18 @@ import java.time.LocalDate
 
 /** Ensambla el system prompt: base + entorno + `AGENTS.md` (global y del proyecto). Los skills llegan en v2. */
 object SystemPrompt {
-    fun build(dirs: Dirs, shell: Shell, workDir: Path, today: LocalDate = LocalDate.now()): String {
-        val parts = mutableListOf(BASE.trimIndent())
-        parts += """
+    fun build(dirs: Dirs, shell: Shell, workDir: Path, today: LocalDate = LocalDate.now()): String =
+        BASE.trimIndent() + "\n\n" + context(dirs, shell, workDir, today)
+
+    /** La parte que no depende del rol: entorno y `AGENTS.md`. Los subagentes la reciben con su propio prompt. */
+    fun context(dirs: Dirs, shell: Shell, workDir: Path, today: LocalDate = LocalDate.now()): String {
+        val parts = mutableListOf("""
             # Entorno
             - Sistema operativo: ${System.getProperty("os.name")} ${System.getProperty("os.arch")}
             - Shell de la tool `bash`: ${shell.displayName}
             - Directorio de trabajo: $workDir
             - Fecha: $today
-        """.trimIndent()
+        """.trimIndent())
         agentsFiles(dirs, workDir).forEach { (path, text) ->
             parts += "# Instrucciones de $path\n\n$text"
         }
