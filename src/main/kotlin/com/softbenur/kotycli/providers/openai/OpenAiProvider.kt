@@ -163,6 +163,7 @@ class OpenAiWire(private val providerId: String) {
         var stop: StopReason? = null
         var usage = Usage()
         val reasoning = StringBuilder()
+        var reasoningKey: String? = null
         val reader = BufferedReader(stream.reader(Charsets.UTF_8))
         val data = StringBuilder()
 
@@ -176,7 +177,10 @@ class OpenAiWire(private val providerId: String) {
                 delta["content"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let {
                     acc.text(it); emit(StreamEvent.TextDelta(it))
                 }
-                delta["reasoning_content"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.let { reasoning.append(it) }
+                reasoningDelta(delta)?.let { (key, chunk) ->
+                    if (reasoningKey == null) reasoningKey = key // se devuelve con el mismo nombre con el que llegó
+                    reasoning.append(chunk)
+                }
                 delta["tool_calls"]?.takeIf { it !is JsonNull }?.jsonArray?.forEach { tc ->
                     val call = tc.jsonObject
                     val index = call["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
@@ -204,7 +208,7 @@ class OpenAiWire(private val providerId: String) {
         }
         if (data.isNotEmpty()) handleEvent(data.toString())
 
-        if (reasoning.isNotEmpty()) acc.opaque(Block.Opaque(providerId, buildJsonObject { put("reasoning_content", reasoning.toString()) }))
+        if (reasoning.isNotEmpty()) acc.opaque(Block.Opaque(providerId, buildJsonObject { put(reasoningKey ?: REASONING_KEYS.first(), reasoning.toString()) }))
         emit(StreamEvent.Done(acc.build(stop ?: if (acc.hasToolCalls()) StopReason.TOOL_USE else StopReason.END_TURN, usage)))
     }
 
@@ -214,7 +218,8 @@ class OpenAiWire(private val providerId: String) {
         val choice = obj["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: throw ProviderException("Respuesta sin choices: $obj")
         val message = choice["message"]?.jsonObject ?: throw ProviderException("Respuesta sin message: $obj")
         message["content"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.let { acc.text(it) }
-        message["reasoning_content"]?.takeIf { it !is JsonNull }?.let { acc.opaque(Block.Opaque(providerId, buildJsonObject { put("reasoning_content", it) })) }
+        REASONING_KEYS.firstNotNullOfOrNull { key -> message[key]?.takeIf { it !is JsonNull }?.let { key to it } }
+            ?.let { (key, value) -> acc.opaque(Block.Opaque(providerId, buildJsonObject { put(key, value) })) }
         message["tool_calls"]?.takeIf { it !is JsonNull }?.jsonArray?.forEachIndexed { i, tc ->
             val call = tc.jsonObject
             val id = call["id"]?.jsonPrimitive?.content ?: "call_$i"
@@ -225,6 +230,11 @@ class OpenAiWire(private val providerId: String) {
         val stop = choice["finish_reason"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.let { mapFinish(it) }
         val usage = obj["usage"]?.takeIf { it !is JsonNull }?.jsonObject?.let { parseUsage(it) } ?: Usage()
         return acc.build(stop ?: if (acc.hasToolCalls()) StopReason.TOOL_USE else StopReason.END_TURN, usage)
+    }
+
+    /** El razonamiento del delta, con el nombre que le da este gateway, o null si no hay nada nuevo. */
+    private fun reasoningDelta(delta: JsonObject): Pair<String, String>? = REASONING_KEYS.firstNotNullOfOrNull { key ->
+        delta[key]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let { key to it }
     }
 
     private fun parseUsage(u: JsonObject) = Usage(
@@ -238,5 +248,10 @@ class OpenAiWire(private val providerId: String) {
         "length" -> StopReason.MAX_TOKENS
         "content_filter" -> StopReason.REFUSAL
         else -> StopReason.OTHER
+    }
+
+    companion object {
+        /** Cada gateway llama al razonamiento de una manera: `reasoning_content` en DeepSeek y vLLM, `reasoning` en OpenRouter. */
+        private val REASONING_KEYS = listOf("reasoning_content", "reasoning")
     }
 }
