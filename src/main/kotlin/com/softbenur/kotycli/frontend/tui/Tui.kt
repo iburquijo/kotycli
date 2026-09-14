@@ -17,6 +17,7 @@ import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReader
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
+import org.jline.reader.impl.completer.StringsCompleter
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
 import org.jline.utils.AttributedStringBuilder
@@ -28,7 +29,10 @@ import org.jline.utils.AttributedStyle
  */
 class Tui(private val session: Session, private val banner: String) {
     private val terminal: Terminal = TerminalBuilder.builder().system(true).encoding(Charsets.UTF_8).build()
-    private val reader: LineReader = LineReaderBuilder.builder().terminal(terminal).build()
+    private val reader: LineReader = LineReaderBuilder.builder()
+        .terminal(terminal)
+        .completer(StringsCompleter(listOf("/exit", "/help") + session.skills.names().map { "/$it" }))
+        .build()
     private val out get() = terminal.writer()
 
     suspend fun run() = coroutineScope {
@@ -47,7 +51,9 @@ class Tui(private val session: Session, private val banner: String) {
             if (text.isEmpty()) continue
             if (text == "/exit" || text == "/quit") break
             if (text == "/help") { help(); continue }
-            runTurn(this, text)
+            val expanded = session.skills.expand(text)
+            if (expanded != null) styled("● skill ${text.drop(1).substringBefore(' ')}", AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA))
+            runTurn(this, expanded ?: text)
         }
         printer.cancelAndJoin()
         terminal.close()
@@ -67,7 +73,8 @@ class Tui(private val session: Session, private val banner: String) {
     }
 
     private fun help() {
-        styled("/exit   salir\n/help   esta ayuda\n(/compact, /config, /copy, /edit y /<skill> llegan en v1.1 y v2)", AttributedStyle.DEFAULT.faint())
+        val skills = session.skills.all.joinToString("") { "\n/${it.name}".padEnd(9) + it.description.lineSequence().first().take(90) }
+        styled("/exit   salir\n/help   esta ayuda$skills\n(/compact, /config, /copy y /edit llegan en v1.1)", AttributedStyle.DEFAULT.faint())
     }
 
     private fun subscribe(scope: CoroutineScope): Job = scope.launch {

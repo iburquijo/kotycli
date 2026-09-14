@@ -38,7 +38,7 @@ class ArchitectureTest {
             val rel = p.relativeTo(root).toString()
             val text = p.readText()
             (!rel.startsWith("frontend") && rel != "Main.kt" && text.contains("import com.softbenur.kotycli.frontend")) ||
-                (rel.startsWith("core") && Regex("""import dev\.kotycli\.tools\.(BashTool|ReadTool|EditTool|CreateTool)""").containsMatchIn(text)) ||
+                (rel.startsWith("core") && Regex("""import com\.softbenur\.kotycli\.tools\.(BashTool|ReadTool|EditTool|CreateTool|TaskTool)""").containsMatchIn(text)) ||
                 (rel.startsWith("core") && text.contains("import com.softbenur.kotycli.interceptors"))
         }
         assertTrue(offenders.isEmpty(), "dependencias prohibidas: $offenders")

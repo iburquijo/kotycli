@@ -4,7 +4,40 @@ Memoria de trabajo entre sesiones. Se actualiza al cerrar cada tramo de trabajo:
 
 ## Dónde estamos (2026-09-14)
 
-**v1 del roadmap implementada** (`docs/architecture/07-build-y-distribucion.md`, sección Roadmap), en la rama `claude/kotycli-repo-structure-hfxqoh`, pendiente de merge a `main`.
+**v2 en marcha: hechos el punto 1 (tool `task` y subagentes) y el punto 2 (skills)**, más la tool `fetch` que quedaba de v1.1. Todo en la rama `claude/v2-implementation-continue-hf4wc6`, abierta en el [PR #3](https://github.com/iburquijo/kotycli/pull/3) y pendiente de revisión. Lo de abajo (v1) ya está en `main`.
+
+Tramo 1 (`task` y subagentes):
+
+- `agents/AgentType.kt` con los roles builtin `explorer` (solo lectura, con allowlist de `rg`, `git log`, `ls`… en `permissionRules`) e `implementor` (todo menos `task`).
+- `agents/AgentTypeLoader.kt`: roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`; gana proyecto > usuario > builtin.
+- `skills/Frontmatter.kt`: el parser de frontmatter plano, compartido con los skills.
+- `tools/TaskTool.kt`: otro `runLoop` con contexto virgen, mismo `Budget`, mismos interceptores, mismo `ToolEnv`; devuelve solo el último mensaje del hijo. Profundidad máxima 2 y `Semaphore` del padre.
+- `Tool.parallel` (por defecto `readOnly`) para que `task`, que no es de solo lectura, se ejecute en paralelo con otras llamadas de la misma ronda. El dispatcher particiona por ahí.
+- `AgentConfig.permissionRules`: reglas de permisos por agente, que `RulePolicy` suma a las globales. Formato `allow:bash(rg *)`.
+- `SystemPrompt.context()`: el bloque de entorno + `AGENTS.md` se separa del prompt base para dárselo al hijo junto al prompt de su rol.
+- Actualizados los docs 02, 03 y 04.
+
+Tramo 2 (skills):
+
+- `skills/SkillLoader.kt`: escanea `~/.agents/skills/` y los `.agents/skills/` del proyecto, desde la raíz del repo (la que tiene `.git`) hasta el directorio actual; gana el más cercano. Un skill sin `description` se ignora.
+- `SkillCatalog.promptSection()` mete en el system prompt la lista `nombre — descripción — ruta`; el cuerpo lo lee el modelo con `read` cuando le hace falta, y se lee del disco en cada uso (editar un `SKILL.md` a mitad de sesión tiene efecto).
+- `SkillCatalog.expand()` convierte `/nombre args` en un mensaje de usuario con el cuerpo del skill. Lo usan la TUI (con completer de JLine y listado en `/help`) y `--plain`.
+- Los subagentes también ven la lista: va en `SystemPrompt.context()`.
+- Sigue faltando `/reload` y los skills builtin embebidos en el jar.
+
+Tramo 3 (tool `fetch`, lo que quedaba de v1.1):
+
+- `tools/FetchTool.kt`: GET sobre el `HttpClient` común, solo `http(s)`, timeout de 30 s y corte a 512 KB. El HTML vuelve como markdown (jsoup, quitando `script`, `style`, `nav`, `header`, `footer`…); el resto tal cual, y `raw: true` desactiva la conversión. Con esto el toolset de `explorer` ya existe entero.
+
+Además, arreglado un fallo de cancelación en `bash`: el lector de la salida era hijo del turn y un `read()` bloqueado no se interrumpe, así que si `ProcessHandle.descendants()` no ve a los nietos (pasa en contenedores sin `/proc` completo) el nieto mantenía el pipe abierto y Ctrl+C tardaba lo que tardase el comando. Ahora el lector va en su propio scope y se abandona al cancelar. Eso era el test flaky de `BashToolTest`.
+
+49 tests en total (15 nuevos), verde cinco veces seguidas.
+
+Pendiente antes de fiarse: nadie ha visto todavía un subagente ni un skill contra un proveedor real, solo contra el `FakeProvider`. Para eso ya hay endpoint: [OpenRouter con `nvidia/nemotron-3.5-lightning:free`](#openrouter-con-nvidianemotron-35-lightningfree-probado), gratis y con `tools`, que da de sobra para pruebas básicas.
+
+## v1 (ya en main)
+
+**v1 del roadmap implementada** (`docs/architecture/07-build-y-distribucion.md`, sección Roadmap) y mergeada a `main` en el PR #2.
 
 Lo que hay:
 
@@ -73,29 +106,24 @@ Avisos: `kotycli doctor` hace `GET {baseUrl}/models`, que es la API nativa y pue
 - El razonamiento se guarda con el nombre que le da cada gateway (`reasoning_content` en DeepSeek y vLLM, `reasoning` en OpenRouter) y se devuelve con ese mismo nombre. Antes solo se miraba `reasoning_content` y con OpenRouter se perdía entero. No se guardan los `reasoning_details` estructurados: hoy ningún modelo probado los necesita para encadenar tool calls, y reconstruirlos desde los deltas es otro tramo. Medido: el eco del razonamiento son +93 tokens de entrada en una conversación de tres iteraciones, sin cambio apreciable de latencia.
 - `bash` ejecuta el script desde un fichero temporal, no como argumento de `-c`: Java en Windows no escapa las comillas dobles dentro de un argumento y `bash.exe` cortaba el script en la primera. Descubierto por el CI de Windows.
 
-## Deuda conocida
+## Siguiente sesión: seguir la v2
 
-- `BashToolTest.cancelar mata el proceso y no deja el script temporal` **falla de forma intermitente en la suite completa** (2 de 3 pasadas), y pasa siempre aislado. También falla en `main` sin ningún cambio encima, con el síntoma exacto: la cancelación se come los 30s del `sleep` entero en vez de cortar a los 500ms. Con la máquina cargada, la cancelación no llega a matar el proceso. O el test es frágil o la cancelación de `bash` tiene una carrera de verdad; hay que mirarlo antes de fiarse del Ctrl+C.
+De v1.1 solo queda esto:
 
-## Siguiente sesión: empezar la v2
-
-Lo que queda de v1.1 es pequeño y se puede hacer al entrar en v2 o intercalado:
-
-- Tool `fetch` (jsoup ya está en el catálogo, sin usar). `readOnly = true`, solo `http(s)`, usa `ToolEnv.http`.
-- Comandos `/` en la TUI con completer de JLine: `/compact` (implica escribir la compactación en `ContextManager`, nivel 3), `/config`, `/copy`, `/edit` al `$EDITOR`, `/reload`.
+- Comandos `/` en la TUI: `/compact` (implica escribir la compactación en `ContextManager`, nivel 3), `/config`, `/copy`, `/edit` al `$EDITOR`, `/reload`. El completer de JLine ya está puesto, con los skills dentro.
 
 v2 según el roadmap:
 
-1. **Tool `task` y subagentes** (`04-subagentes.md`): `AgentType`, roles builtin `explorer` e `implementor`, `ToolRegistry.restrictedTo`, mismo `Budget`, `Semaphore` (ya está en `AgentContext.subagentSemaphore`), profundidad 2, eventos `SubagentStart`/`SubagentEnd` (ya existen y los frontends ya los pintan). Roles propios en `.agents/agents/*.md`.
-2. **Skills** (`05-skills.md`): `SkillLoader` sobre `.agents/skills/` y `~/.agents/skills/`, parser de frontmatter plano, lista `nombre — descripción — ruta` en el system prompt, `/nombre args` en la TUI. Reutilizar el mismo parser para los roles de subagente.
+1. ~~**Tool `task` y subagentes**~~ hecho.
+2. ~~**Skills**~~ hecho.
 3. **Proveedor `copilot`** (`06-proveedores.md`, ADR 0012): `OpenAiProvider` con un `Authenticator` que hace device flow, exchange de token y cabeceras `Editor-Version`/`Copilot-Integration-Id`. Token en `~/.kotycli/auth/github.json`. Tests contra fixtures, nunca contra la API real.
 
-Orden sugerido: `task` primero (es lo que más valor da y ya tiene medio cableado en el core), skills después, Copilot cuando haya acceso para probarlo. Cada tramo termina con tests y con esta nota actualizada.
+Siguiente: Copilot cuando haya acceso para probarlo, y los comandos `/` que faltan. Cada tramo termina con tests y con esta nota actualizada.
 
 ## Cómo retomar
 
 ```
-git fetch origin && git checkout claude/kotycli-repo-structure-hfxqoh   # o main si ya está mergeado
+git fetch origin && git checkout claude/v2-implementation-continue-hf4wc6
 ./gradlew build
 ```
 
