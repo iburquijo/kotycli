@@ -7,7 +7,7 @@ Una carpeta con un `SKILL.md` y, opcionalmente, ficheros de apoyo (scripts, refe
 Adoptamos el formato abierto de Agent Skills tal cual, para reutilizar skills que ya existen y compartir los nuestros:
 
 ```
-.kotycli/skills/
+.agents/skills/
   deploy-staging/
     SKILL.md
     scripts/check-health.sh
@@ -33,8 +33,8 @@ Frontmatter mínimo: `name` y `description`. Todo lo demás es opcional.
 
 En este orden, y el más específico gana si hay colisión de nombre:
 
-1. `.kotycli/skills/` en el proyecto (raíz del repo y, si estamos en un subdirectorio, los padres hasta la raíz del repo).
-2. `~/.kotycli/skills/` del usuario.
+1. `.agents/skills/` en el proyecto (raíz del repo y, si estamos en un subdirectorio, los padres hasta la raíz del repo).
+2. `~/.agents/skills/` del usuario.
 3. Skills builtin embebidos en el jar (pocos).
 
 ## Carga progresiva sin tool nueva
@@ -54,7 +54,7 @@ El usuario también puede invocar un skill explícitamente con `/nombre argument
 
 ## Instrucciones de proyecto: `KOTYCLI.md`
 
-Un fichero `KOTYCLI.md` en la raíz del proyecto (y `~/.kotycli/KOTYCLI.md` para el usuario) se inyecta siempre al system prompt. Es el sitio para convenciones del repo, comandos de build y el shell que hay debajo de `bash`. Se mantiene corto: todo lo que se pueda mover a un skill, se mueve.
+Un fichero `KOTYCLI.md` en la raíz del proyecto (y `~/.agents/KOTYCLI.md` para el usuario) se inyecta siempre al system prompt. Es el sitio para convenciones del repo, comandos de build y el shell que hay debajo de `bash`. Se mantiene corto: todo lo que se pueda mover a un skill, se mueve.
 
 ## Caché
 

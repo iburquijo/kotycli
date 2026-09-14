@@ -11,7 +11,7 @@ En el trabajo el modelo disponible es GitHub Copilot. Su API de chat habla el wi
 - Adaptador `copilot` implementado como `OpenAiProvider` con un `Authenticator` y headers distintos. Sin lógica de wire duplicada.
 - Adaptador `openai` genérico como **plan B permanente**, no como opción secundaria: cualquier endpoint `/v1/chat/completions` (Ollama en casa, gateways corporativos, vLLM, OpenRouter, Azure).
 - Orden de implementación: `openai` primero (v1, contra Ollama), `copilot` después (v2). El desarrollo nunca depende de Copilot.
-- El token de GitHub se guarda en `~/.kotycli/auth/`, nunca en config ni en el repo.
+- El token de GitHub se guarda en `~/.agents/auth/`, nunca en config ni en el repo.
 
 ## Riesgo asumido
 

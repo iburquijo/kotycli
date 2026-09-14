@@ -55,7 +55,7 @@ flowchart TB
     Loop --> P
     P --> OAI & CP & AN
     OAI & CP & AN & fetch --> HTTP
-    Skills[(.kotycli/skills/*/SKILL.md)] -.->|read| read
+    Skills[(.agents/skills/*/SKILL.md)] -.->|read| read
 ```
 
 La frontera que paga dividendos: TUI, ACP y `--plain` son tres `main` distintos consumiendo el mismo core. Añadir un frontend nunca toca el loop.

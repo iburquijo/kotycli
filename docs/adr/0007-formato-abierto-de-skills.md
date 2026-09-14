@@ -11,7 +11,7 @@ Queremos instrucciones reutilizables por tarea, cargadas solo cuando aplican par
 - Adoptar ese formato sin extensiones propias obligatorias.
 - Descripciones y rutas siempre en el system prompt; cuerpo bajo demanda **leyéndolo con `read`**. No hay tool `skill`: seguimos en seis tools (ADR 0003) y el modelo ya sabe leer ficheros.
 - Invocación explícita `/nombre argumentos` desde el frontend.
-- Búsqueda en `.kotycli/skills/` (proyecto), `~/.kotycli/skills/` (usuario) y builtin embebidos, en ese orden de precedencia.
+- Búsqueda en `.agents/skills/` (proyecto), `~/.agents/skills/` (usuario) y builtin embebidos, en ese orden de precedencia.
 - Las definiciones de roles de subagente usan el mismo markdown con frontmatter, para tener un solo parser.
 - Instrucciones siempre presentes van en `KOTYCLI.md`, no en un skill.
 

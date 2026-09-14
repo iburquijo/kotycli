@@ -117,7 +117,7 @@ Interceptores previstos, en orden:
 |-------------|--------|-------|
 | `PathGuard` | Canonicaliza rutas del input contra el working dir; deniega las que se salen | |
 | `Permissions` | `Allow` / `Ask` / `Deny` según modo y reglas; `Ask` emite `PermissionAsk` y espera la respuesta del frontend | |
-| `ToolLog` | Escribe la llamada a `~/.kotycli/logs/tools.jsonl` | Escribe resultado, duración y `isError` |
+| `ToolLog` | Escribe la llamada a `~/.agents/logs/tools.jsonl` | Escribe resultado, duración y `isError` |
 | `Truncate` | | Corta el resultado a ~30-50 KB conservando cabeza y cola, avisando en el propio texto |
 
 Esto es todo el "sistema de hooks". Un punto de corte before/after cubre permisos, logging y guardas. No hay hooks configurables por fichero: para un usuario, el código es la config (ver ADR 0009).

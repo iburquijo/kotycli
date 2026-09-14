@@ -21,7 +21,7 @@ Pocas y aburridas:
 | HTML a markdown en `fetch` | `jsoup` | Maduro, sin dependencias transitivas |
 | YAML de frontmatter | parser propio mínimo | El frontmatter es `clave: valor` plano |
 | Tests | JUnit 5 + `kotlinx-coroutines-test` | Estándar |
-| Logs | `slf4j` + `logback` a fichero (`~/.kotycli/logs/`) | Nunca a stdout, que es del frontend (y en ACP, del protocolo) |
+| Logs | `slf4j` + `logback` a fichero (`~/.agents/logs/`) | Nunca a stdout, que es del frontend (y en ACP, del protocolo) |
 
 Cosas que **no** entran: Spring, frameworks de DI, Jackson, frameworks de TUI de pantalla completa, librerías de "agentes" que impongan su propio loop, SDKs de proveedor salvo que el adaptador `anthropic` lo justifique.
 
@@ -66,7 +66,7 @@ src/main/kotlin/dev/kotycli/
   http/
     Http.kt                    # el único HttpClient: truststore, proxy, timeouts
   config/
-    Config.kt                  # carga ~/.kotycli + .kotycli, merge, env
+    Config.kt                  # carga ~/.agents + .agents, merge, env
   frontend/
     tui/Tui.kt                 # append-only, JLine, comandos /, pager
     plain/Plain.kt             # sin ANSI, sin raw mode
@@ -89,7 +89,7 @@ nadie fuera de providers/<x> -> tipos de wire de <x>
 ## Ficheros en disco
 
 ```
-~/.kotycli/
+~/.agents/
   config.json
   settings.json          # reglas de permisos persistidas
   auth/github.json       # token de device flow (solo Copilot)
@@ -99,7 +99,7 @@ nadie fuera de providers/<x> -> tipos de wire de <x>
   logs/                  # app.log, tools.jsonl
   sessions/<id>.jsonl    # historial serializado, para --resume (después)
 
-<repo>/.kotycli/
+<repo>/.agents/
   config.json            # override por proyecto
   settings.json
   skills/

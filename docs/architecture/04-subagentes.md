@@ -31,7 +31,7 @@ Roles builtin:
 | `explorer` | `read`, `fetch`, `bash` (bajo política de solo lectura: allowlist de `rg`, `fd`, `git log`, `ls`, `cat`) | Localizar código, responder "dónde está X" |
 | `implementor` | Todo menos `task` | Cambios acotados y bien especificados |
 
-Roles propios en `.kotycli/agents/*.md` y `~/.kotycli/agents/*.md`: markdown con frontmatter (`name`, `description`, `tools`, `model`) y el system prompt como cuerpo. Mismo formato que los skills para tener un solo parser.
+Roles propios en `.agents/agents/*.md` y `~/.agents/agents/*.md`: markdown con frontmatter (`name`, `description`, `tools`, `model`) y el system prompt como cuerpo. Mismo formato que los skills para tener un solo parser.
 
 ## La tool `task`
 
