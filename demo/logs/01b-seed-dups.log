@@ -1,0 +1,32 @@
+● read  /home/user/kotycli/demo/medallion/jobs/seed.py
+  └ 1	"""Generador de datos sintéticos para el pipeline medallion. … (142 líneas) (37ms)
+Ahora entiendo el problema. En `jobs/seed.py`, las líneas 112-113 reasignan `order_id` de forma secuencial a todas las filas, lo que hace que los duplicados pierdan el `order_id` original de la fila de la que son copias. Los duplicados fueron creados con `dict(orders[idx])` que ya incluye el `order_id` correcto, pero luego se sobreescribe.
+
+Vamos a arreglar quitando el re-asignamiento de `order_id`:
+
+
+● edit  /home/user/kotycli/demo/medallion/jobs/seed.py
+  └ Editado /home/user/kotycli/demo/medallion/jobs/seed.py: 1 sustitución (4ms)
+Ahora ejecutemos el generador y verifiquemos:
+
+
+● bash  Ejecutar generador de datos seed  ·  cd /home/user/kotycli/demo/medallion && ../.venv/bin/python -m jobs.seed
+  └ Datos generados en /home/user/kotycli/demo/medallion/jobs/../landing/ … (5 líneas) (110ms)
+Total 5050 filas como se esperaba. Ahora comprobaré que hay ~50 filas duplicadasenteras:
+
+
+● bash  Comprobar duplicados en orders.csv  ·  cd /home/user/kotycli/demo/medallion && ../.venv/bin/python -c "
+  └ Total filas: 5050 … (21 líneas) (43ms)
+Exacto: 50 order_ids duplicados, cada uno aparece 2 veces (original + copia), total 100 filas duplicadas sobre 5050 totales. Ahora hay que dar los "tres recuentos de suciedad" según el seed.py. Voy a contar los tres tipos de suciedad en el CSV generado:
+
+
+● bash  Contar los tres tipos de suciedad  ·  cd /home/user/kotycli/demo/medallion && ../.venv/bin/python -c "
+  └ 1. customer_id inexistente (>200): 101 de 5050 … (9 líneas) (96ms)
+Los tres recuentos de suciedad en `orders.csv` (sobre 5050 filas):
+
+1. **customer_id inexistente**: 101 filas (≈2% sobre las 5000 originales)
+2. **quantity vacío o negativo**: 151 filas (≈3% sobre las 5000 originales)
+3. **filas duplicadas** (mismo order_id): 100 filas (50 order_ids repetidos, cada uno original + copia)
+
+**Resumen de la fix**: Se eliminó el bucle de re-asignación de `order_id` (líneas 112-113 de `jobs/seed.py`) que estaba sobrescribiendo los `order_id` originales de las filas duplicadas. Ahora los duplicados conservan el mismo `order_id` que la fila de origen, tal como se requiere.
+— 42.0k tokens · 165.6s

@@ -104,7 +104,10 @@ class Plain(
             is AgentEvent.BudgetExceeded -> out.println("[presupuesto agotado: ${e.what}]")
             is AgentEvent.Refusal -> out.println("[el modelo ha rechazado continuar]")
             is AgentEvent.Failed -> out.println("[error del proveedor: ${e.message}]")
-            is AgentEvent.TurnEnd -> if (e.agentId == session.root.id) out.println("— ${Render.tokens(e.usage.total)} tokens · ${Render.formatMs(e.durationMs)}")
+            is AgentEvent.TurnEnd -> if (e.agentId == session.root.id) {
+                if (!e.answered) out.println("[el modelo ha terminado sin contestar nada]")
+                out.println("— ${Render.tokens(e.usage.total)} tokens · ${Render.formatMs(e.durationMs)}")
+            }
             is AgentEvent.UsageUpdate -> {}
         }
     }

@@ -14,6 +14,7 @@ suspend fun runLoop(ctx: AgentContext, userInput: String) {
     ctx.messages += Message.user(userInput)
     var iterations = 0
     var turnUsage = Usage()
+    var answered = false
     val started = System.nanoTime()
 
     try {
@@ -40,6 +41,7 @@ suspend fun runLoop(ctx: AgentContext, userInput: String) {
             }
 
             ctx.messages += completion.message
+            if (completion.message.text.isNotBlank()) answered = true
             ctx.recordUsage(completion.usage)
             turnUsage += completion.usage
             ctx.emit(AgentEvent.AssistantMessage(ctx.id, completion.message))
@@ -78,7 +80,7 @@ suspend fun runLoop(ctx: AgentContext, userInput: String) {
         }
     } finally {
         withContext(NonCancellable) {
-            ctx.emit(AgentEvent.TurnEnd(ctx.id, turnUsage, (System.nanoTime() - started) / 1_000_000))
+            ctx.emit(AgentEvent.TurnEnd(ctx.id, turnUsage, (System.nanoTime() - started) / 1_000_000, answered))
         }
     }
 }

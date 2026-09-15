@@ -54,6 +54,30 @@ Ahí salieron los dos fallos que los tests no habían visto: un `describe()` que
 (`StackOverflowError`, el parámetro del constructor tapaba al método) y los números incomparables del evento
 `Compacted`. Los dos tienen ahora test.
 
+### Tramo 6 (primera corrida real: OpenRouter + TUI en terminal de verdad)
+
+Carpeta `demo/`, con su propio README. kotycli manejado por `nvidia/nemotron-3.5-lightning:free` a
+través de OpenRouter, escribiendo un ETL medallion en PySpark. Dos fallos encontrados y arreglados:
+
+- **La TUI se comía los acentos sin `LANG` UTF-8.** `ensureUtf8Stdout()` solo cubre `System.out`; la
+  TUI escribe por el writer de JLine, que desde JLine 3.25 usa `stdoutEncoding`, un ajuste distinto de
+  `encoding`. Arreglado en `Tui.terminalBuilder()`, test en `TerminalEncodingTest`. **Es la primera vez
+  que la TUI se ejecutaba fuera de un test**, con `script` para tener un PTY: el fallo apareció en el
+  primer arranque.
+- **Un turn que acaba sin texto no se distinguía de un cuelgue.** `TurnEnd` lleva ahora `answered` y los
+  dos frontends lo avisan. Test en `RunLoopTest`.
+
+Anotado y no arreglado:
+
+- `Config.load` no sube por el árbol de directorios, a diferencia de `SkillLoader`. Hubo que poner el
+  `.kotycli/` dentro del proyecto en vez de un nivel por encima. Inconsistencia, no fallo.
+- `read` sobre un directorio devuelve error; el modelo lo intentaba en casi cada arranque. Quizá
+  debería listar el directorio en vez de fallar.
+- Un 429 del proveedor termina el turn sin más. Con el tier gratuito (50 peticiones/día) pasa pronto;
+  un reintento con backoff para 429 y 504 ahorraría tandas enteras.
+
+98 tests. La demo quedó sin la capa gold: se agotó la cuota diaria de OpenRouter a mitad.
+
 ### Tramo 4 (v3, ACP)
 
 Rama `claude/v3-continue-previous-state-fvn8gm`. Tres ficheros en `frontend/acp/` y un flag:
@@ -165,6 +189,8 @@ No verificado:
 - **`/copy` y `/edit` a mano.** Los dos tienen test, pero en este contenedor no hay portapapeles ni `$EDITOR`:
   el único camino que se ha visto correr de verdad es el de OSC 52. Falta probarlos en un terminal con
   `wl-copy`/`pbcopy` y con un `$EDITOR` real, y en Windows Terminal.
+- **La TUI ya no está sin ejecutar**: `/help`, `/config` y el arranque se han visto en un PTY real (tramo 6).
+  Lo que sigue sin probarse a mano es Ctrl+C cancelando un turn, el completer con Tab y Windows Terminal.
 - **La compactación contra un modelo de verdad.** El corte, el fallo y los números están testeados, pero la
   calidad del resumen solo se puede juzgar con un modelo real y una conversación larga.
 
