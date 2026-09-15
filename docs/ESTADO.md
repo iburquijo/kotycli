@@ -69,8 +69,6 @@ través de OpenRouter, escribiendo un ETL medallion en PySpark. Dos fallos encon
 
 Anotado y no arreglado:
 
-- `Config.load` no sube por el árbol de directorios, a diferencia de `SkillLoader`. Hubo que poner el
-  `.kotycli/` dentro del proyecto en vez de un nivel por encima. Inconsistencia, no fallo.
 - `read` sobre un directorio devuelve error; el modelo lo intentaba en casi cada arranque. Quizá
   debería listar el directorio en vez de fallar.
 - Un 429 del proveedor termina el turn sin más. Con el tier gratuito (50 peticiones/día) pasa pronto;

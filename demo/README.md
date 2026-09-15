@@ -8,15 +8,15 @@ un modelo real en un terminal real. Se rompieron dos cosas; las dos están arreg
 
 ## El token
 
-`medallion/.kotycli/config.json` guarda **el nombre de la variable de entorno**, nunca su valor:
+La config guarda **el nombre de la variable de entorno**, nunca su valor:
 
 ```json
 "apiKeyEnv": "OPENROUTER_TOKEN"
 ```
 
-Ese fichero **no está commiteado**: el `.gitignore` de la raíz ignora `.kotycli/` precisamente para
-que nunca entre configuración local en el repo, y no voy a hacerle un agujero a esa regla. Para
-reproducir la demo, créalo tú en `medallion/.kotycli/config.json`:
+Vive en **`~/.kotycli/config.json`**, que es donde va: el proveedor, el modelo y la clave son del
+usuario, no del repositorio. `Config.load` lee primero `~/.kotycli/` y encima superpone
+`<proyecto>/.kotycli/` si existe, para lo que de verdad sea del proyecto. Para reproducir la demo:
 
 ```json
 {
@@ -33,9 +33,6 @@ reproducir la demo, créalo tú en `medallion/.kotycli/config.json`:
   }
 }
 ```
-
-Tiene que ir dentro de `medallion/`, no en `demo/`: `Config.load` mira `~/.kotycli` y
-`<workDir>/.kotycli`, y no sube por el árbol de directorios.
 
 El token se lee de `$OPENROUTER_TOKEN` en tiempo de ejecución. No está en ningún fichero de este
 repositorio, ni en los logs, ni en los pantallazos: se comprobó con `grep -rF "$OPENROUTER_TOKEN"`
@@ -135,8 +132,6 @@ las dos líneas de tool y el separador de tokens, y nada más: parecía que se h
   encargo de silver, más corta y numerada, sí funcionó.
 - **Ignora parte del `AGENTS.md`**: usó `python3` del sistema para comprobaciones sueltas pese a que el
   fichero dice explícitamente que nunca lo haga (daba igual, eran scripts de la librería estándar).
-- **`Config.load` no sube por el árbol de directorios**, a diferencia de `SkillLoader`. Hubo que poner
-  `.kotycli/` dentro de `medallion/` en vez de en `demo/`. Es una inconsistencia, no un fallo.
 - Dejó un typo inocuo en `bronze.py`: `LAKING_DIR` por `LANDING_DIR`. Se deja tal cual: el código es suyo.
 
 ## Por qué falta la capa gold
