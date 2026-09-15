@@ -106,7 +106,7 @@ class Plain(
             is AgentEvent.Failed -> out.println("[error del proveedor: ${e.message}]")
             is AgentEvent.TurnEnd -> if (e.agentId == session.root.id) {
                 if (!e.answered) out.println("[el modelo ha terminado sin contestar nada]")
-                out.println("— ${Render.tokens(e.usage.total)} tokens · ${Render.formatMs(e.durationMs)}")
+                out.println("— ${Render.tokens(e.usage.total)} tokens${Render.cacheNote(e.usage)} · ${Render.formatMs(e.durationMs)}")
             }
             is AgentEvent.UsageUpdate -> {}
         }

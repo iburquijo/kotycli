@@ -153,10 +153,12 @@ Reglas:
 `ContextManager.prepare(ctx)` corre antes de cada llamada al modelo. Tres niveles, del más barato al más caro:
 
 1. **Truncado de resultados en el interceptor `Truncate`.** No es gestión de contexto, es higiene, pero evita el 80% de los problemas.
-2. **Poda de resultados viejos.** Cuando el historial supera un umbral, los `ToolResult` más antiguos que N rondas se sustituyen por un marcador `[resultado descartado, vuelve a ejecutar la tool si lo necesitas]`. Solo si `Capabilities.allowsHistoryEdits`; si no, saltamos al nivel 3.
+2. **Poda de resultados viejos.** Cuando el historial supera un umbral, los `ToolResult` más antiguos que N rondas se sustituyen por un marcador `[resultado descartado, vuelve a ejecutar la tool si lo necesitas]`. Solo si `Capabilities.allowsHistoryEdits` **y** el proveedor no cachea el prefijo (`promptCaching`): podar reescribe mensajes ya enviados y eso tira la caché desde ahí. Si no se puede podar, se salta al nivel 3.
 3. **Compactación** (`/compact`, o automática al pasar del 90% de la ventana). Se le pide un resumen al modelo en una petición aparte —sin tools, con su propio system prompt— y el historial pasa a ser `[resumen] + [últimos K turnos]`. Se emite `Compacted` y `/compact` devuelve además un `CompactResult` (`Done`, `NothingToDo` o `Failed`) para que el frontend sepa qué contar.
 
 Estimación de tokens: el `usage` de la última respuesta como medida real. Sin él —sesión nueva o recién compactada—, caracteres/4.
+
+Se cuenta `Usage.total`, que incluye lo servido de caché. Con un proveedor que cachea, `inputTokens` es solo la cola no cacheada: mirando ese campo, un contexto de 90k parecería de 2k y no se compactaría nunca. Ver el doc 06, sección «Caché de prefijo».
 
 Reglas de la compactación:
 

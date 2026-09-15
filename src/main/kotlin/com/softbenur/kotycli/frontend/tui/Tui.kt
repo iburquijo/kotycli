@@ -153,7 +153,7 @@ class Tui(private val session: Session, private val banner: String) {
             is AgentEvent.Failed -> styled("[error del proveedor: ${e.message}]", AttributedStyle.DEFAULT.foreground(AttributedStyle.RED))
             is AgentEvent.TurnEnd -> if (!child) {
                 if (!e.answered) warn("[el modelo ha terminado sin contestar nada]")
-                styled("── ${Render.tokens(e.usage.total)} tokens · ${Render.formatMs(e.durationMs)} · sesión ${Render.tokens(session.root.budget.tokensConsumed)} ──", AttributedStyle.DEFAULT.faint())
+                styled("── ${Render.tokens(e.usage.total)} tokens${Render.cacheNote(e.usage)} · ${Render.formatMs(e.durationMs)} · sesión ${Render.tokens(session.root.budget.tokensConsumed)} ──", AttributedStyle.DEFAULT.faint())
             }
             is AgentEvent.UsageUpdate -> {}
         }

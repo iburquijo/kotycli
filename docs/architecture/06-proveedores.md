@@ -21,7 +21,7 @@ data class Request(
 
 data class Capabilities(
     val parallelToolCalls: Boolean,
-    val promptCaching: Boolean,
+    val promptCaching: Boolean,           // true => ContextManager tampoco poda: podar rompe el prefijo
     val allowsHistoryEdits: Boolean,      // false => ContextManager no poda, solo compacta
     val contextWindow: Int,
 )
@@ -56,6 +56,39 @@ El primero que se implementa, porque es el entorno de desarrollo (Ollama en casa
   - El razonamiento y otros campos no estándar se guardan como `Opaque` y vuelven al proveedor con el mismo nombre con el que llegaron:
     `reasoning_content` en DeepSeek y vLLM, `reasoning` en OpenRouter.
 - `Capabilities` se leen de la configuración por modelo, porque varían entre servidores.
+
+## Caché de prefijo
+
+El caching es un match de prefijo: la clave sale de los bytes exactos del prompt renderizado, y cualquier
+cambio invalida todo lo que venga detrás. El orden de render es `tools` -> `system` -> `messages`.
+
+Lo que hace kotycli con eso:
+
+- **`promptCaching` en la config del proveedor.** Cuando está activo, `ContextManager` deja de podar: la poda
+  reescribe `ToolResult` ya enviados y eso tira el prefijo cacheado desde ese punto (ADR 0006). Con caché sale
+  más barato dejar el historial largo y compactar cuando toque.
+- **`Usage` separa lo cacheado.** `inputTokens` es solo la parte procesada al precio completo; el tamaño real
+  del prompt es `promptTokens` (= entrada + leídos de caché + escritos a caché). Esto no es cosmético: la
+  estimación de contexto usa `total`, y si mirase solo `inputTokens` un contexto de 90k parecería de 2k y no
+  se compactaría nunca.
+- **Los dos wires cuentan distinto** y el adaptador normaliza. En el de OpenAI, `prompt_tokens` **incluye** los
+  cacheados y vienen en `prompt_tokens_details.cached_tokens`, así que se restan. En el de Anthropic,
+  `input_tokens` ya los **excluye** y hay campos aparte para lectura y escritura
+  (`cache_read_input_tokens`, `cache_creation_input_tokens`). `OpenAiWire.parseUsage` acepta los dos nombres
+  porque algunos gateways reenvían los de Anthropic; en ambos casos `promptTokens` vuelve a dar el prompt entero.
+- **Se pinta en la línea de fin de turn** (`· caché 11.5k leídos`). El fallo del caching es silencioso: todo
+  sigue funcionando y solo sube la factura, así que la única defensa es tenerlo a la vista.
+
+Lo que rompe la caché a mitad de sesión, y conviene saberlo: cambiar el system prompt (lo hace `/reload`, que
+ahora avisa), cambiar el conjunto de tools, y cambiar de modelo —las cachés son por modelo, así que un
+subagente con otro modelo tiene la suya y no comparte nada con el padre—.
+
+Lo que **no** es problema aquí: la fecha del bloque de entorno del system prompt. Cambia una vez al día y
+dentro de una sesión es constante, así que no invalida nada que importe.
+
+Lo que falta: el adaptador `anthropic` nativo, que es el que puede colocar los `cache_control` explícitos
+(máximo 4 por petición, TTL de 5 minutos o de 1 hora). En la capa OpenAI-compatible no hay nada que colocar:
+donde hay caché es automática del lado del servidor, y lo único que controlamos es la estabilidad del prefijo.
 
 ### `copilot`: GitHub Copilot
 

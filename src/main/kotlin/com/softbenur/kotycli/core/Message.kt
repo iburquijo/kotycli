@@ -33,9 +33,30 @@ sealed interface Block {
 
 enum class StopReason { END_TURN, TOOL_USE, MAX_TOKENS, REFUSAL, OTHER }
 
-data class Usage(val inputTokens: Int = 0, val outputTokens: Int = 0) {
-    val total: Int get() = inputTokens + outputTokens
-    operator fun plus(other: Usage) = Usage(inputTokens + other.inputTokens, outputTokens + other.outputTokens)
+/**
+ * Tokens de una respuesta. `inputTokens` es **solo la parte no cacheada**: el tamaño real del prompt es
+ * `promptTokens`. Los dos wires cuentan distinto y cada adaptador normaliza a esto: en el de OpenAI
+ * `prompt_tokens` incluye los cacheados, y en el de Anthropic `input_tokens` los excluye.
+ */
+data class Usage(
+    val inputTokens: Int = 0,
+    val outputTokens: Int = 0,
+    /** Servidos desde la caché de prefijo; se pagan a una fracción del precio de entrada. */
+    val cacheReadTokens: Int = 0,
+    /** Escritos a la caché en esta petición; se pagan con recargo. */
+    val cacheWriteTokens: Int = 0,
+) {
+    /** Todo lo que el modelo ha leído como prompt, cacheado o no. Esta es la medida del contexto. */
+    val promptTokens: Int get() = inputTokens + cacheReadTokens + cacheWriteTokens
+
+    val total: Int get() = promptTokens + outputTokens
+
+    operator fun plus(other: Usage) = Usage(
+        inputTokens + other.inputTokens,
+        outputTokens + other.outputTokens,
+        cacheReadTokens + other.cacheReadTokens,
+        cacheWriteTokens + other.cacheWriteTokens,
+    )
 }
 
 data class Completion(val message: Message, val stopReason: StopReason, val usage: Usage)

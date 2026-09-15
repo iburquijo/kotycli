@@ -178,7 +178,8 @@ class Bootstrap(private val loadConfig: () -> Config, val workDir: Path, val all
             "proveedor" to "${config.providerName} (${config.provider.type}) · ${config.provider.baseUrl ?: "sin baseUrl"}",
             "modelo" to runCatching { config.model }.getOrDefault("(sin configurar)") +
                 (config.file.subagentModel?.let { " · subagentes $it" } ?: ""),
-            "contexto" to "${config.provider.contextWindow} tokens · salida ${config.provider.maxOutputTokens}",
+            "contexto" to "${config.provider.contextWindow} tokens · salida ${config.provider.maxOutputTokens}" +
+                (if (config.provider.promptCaching) " · con caché de prefijo (no se poda)" else ""),
             "permisos" to "${config.file.permissionMode ?: "default"} · ${policy.rules().size} reglas",
             "truststore" to report.trustSources.joinToString(" + "),
             "proxy" to report.proxyDescription,
@@ -201,7 +202,12 @@ class Bootstrap(private val loadConfig: () -> Config, val workDir: Path, val all
         policy.replaceConfigRules(config.settings.rules())
         val mode = config.file.permissionMode?.let { PermissionMode.parse(it) } ?: PermissionMode.DEFAULT
         val newModel = runCatching { config.model }.getOrNull()
-        val warning = if (newModel != previousModel) " El modelo pasa a ser $newModel al reiniciar; esta sesión sigue con $previousModel." else ""
+        val warning = buildString {
+            if (newModel != previousModel) append(" El modelo pasa a ser $newModel al reiniciar; esta sesión sigue con $previousModel.")
+            // Recargar cambia el system prompt, que va delante de toda la conversación: con caché de prefijo
+            // eso obliga a reprocesar el historial entero en la siguiente petición.
+            if (config.provider.promptCaching) append(" Ojo: cambiar el system prompt invalida la caché de prefijo de esta sesión.")
+        }
         return Reload(
             skills = skills,
             systemPrompt = SystemPrompt.build(config.dirs, shell, workDir, skills),

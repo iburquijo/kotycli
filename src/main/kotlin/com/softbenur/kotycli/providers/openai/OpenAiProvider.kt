@@ -237,10 +237,28 @@ class OpenAiWire(private val providerId: String) {
         delta[key]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let { key to it }
     }
 
-    private fun parseUsage(u: JsonObject) = Usage(
-        inputTokens = u["prompt_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-        outputTokens = u["completion_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-    )
+    /**
+     * `prompt_tokens` es el prompt entero, cacheado incluido, así que la parte cacheada se resta para que
+     * `inputTokens` sea solo lo que se procesó al precio completo. Los tokens de caché viajan con dos nombres
+     * según el gateway: `prompt_tokens_details.cached_tokens` (convención OpenAI, que es solo lectura) o
+     * `cache_read_input_tokens`/`cache_creation_input_tokens` (convención Anthropic, que distingue escritura).
+     * Se aceptan los dos, y en ambos casos `promptTokens` vuelve a dar `prompt_tokens`.
+     */
+    fun parseUsage(u: JsonObject): Usage {
+        val details = u["prompt_tokens_details"]?.takeIf { it !is JsonNull }?.jsonObject
+        val cacheRead = details?.int("cached_tokens") ?: u.int("cache_read_input_tokens")
+        val cacheWrite = u.int("cache_creation_input_tokens")
+        val prompt = u.int("prompt_tokens")
+        return Usage(
+            inputTokens = (prompt - cacheRead - cacheWrite).coerceAtLeast(0),
+            outputTokens = u.int("completion_tokens"),
+            cacheReadTokens = cacheRead,
+            cacheWriteTokens = cacheWrite,
+        )
+    }
+
+    private fun JsonObject.int(key: String): Int =
+        this[key]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.toIntOrNull() ?: 0
 
     private fun mapFinish(reason: String): StopReason = when (reason) {
         "stop" -> StopReason.END_TURN

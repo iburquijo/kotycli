@@ -11,6 +11,7 @@ object Providers {
         val capabilities = Capabilities(
             parallelToolCalls = cfg.parallelToolCalls,
             allowsHistoryEdits = cfg.allowsHistoryEdits,
+            promptCaching = cfg.promptCaching,
             contextWindow = cfg.contextWindow,
         )
         return when (cfg.type) {

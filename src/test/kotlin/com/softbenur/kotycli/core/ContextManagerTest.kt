@@ -146,4 +146,37 @@ class ContextManagerTest {
         val results = ctx.messages.flatMap { it.content.filterIsInstance<Block.ToolResult>() }
         assertEquals(List(3) { ContextManager.PRUNED } + listOf("salida larga 3", "salida larga 4"), results.map { it.content })
     }
+
+    /**
+     * El bug que motivó todo esto: con caché, `inputTokens` es solo la cola no cacheada. Si la estimación
+     * mirase ese campo, un contexto de 90k parecería de 2k y no se compactaría nunca.
+     */
+    @Test
+    fun `la estimacion cuenta los tokens servidos de cache`() = runTest {
+        val ctx = testContext(FakeProvider(mutableListOf(), capabilities = Capabilities(contextWindow = 100_000)))
+        ctx.messages += Message.user("turno")
+        ctx.messages += Message.assistant("respuesta") // el historial acaba en el asistente: nada pendiente que sumar
+        ctx.recordUsage(Usage(inputTokens = 2_000, outputTokens = 500, cacheReadTokens = 80_000, cacheWriteTokens = 8_000))
+
+        assertEquals(90_500, ctx.contextManager.estimateTokens(ctx))
+        // Mirando solo `inputTokens`, como se hacía antes, habrían salido 2.500 y nunca se habría compactado.
+        assertTrue(ctx.contextManager.estimateTokens(ctx) > 100_000 * 0.9)
+    }
+
+    /** Podar reescribe el prefijo ya enviado, y eso tira la caché: con un proveedor que cachea, no se poda. */
+    @Test
+    fun `con cache de prefijo no se poda`() = runTest {
+        val caching = Capabilities(contextWindow = 10_000, promptCaching = true)
+        val ctx = testContext(FakeProvider(mutableListOf(), capabilities = caching), contextManager = ContextManager(keepRounds = 1))
+        repeat(4) { i ->
+            ctx.messages += Message(Role.ASSISTANT, listOf(Block.ToolUse("c$i", "echo", json())))
+            ctx.messages += Message.toolResults(listOf(Block.ToolResult("c$i", "salida $i")))
+        }
+        ctx.recordUsage(Usage(inputTokens = 100, outputTokens = 0, cacheReadTokens = 7_700))
+
+        ctx.contextManager.prepare(ctx)
+
+        val results = ctx.messages.flatMap { it.content.filterIsInstance<Block.ToolResult>() }
+        assertTrue(results.none { it.content == ContextManager.PRUNED }, "no debería haber podado nada")
+    }
 }

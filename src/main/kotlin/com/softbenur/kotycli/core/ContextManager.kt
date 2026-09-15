@@ -30,16 +30,27 @@ class ContextManager(
             compact(ctx)
             return
         }
-        if (!ctx.provider.capabilities.allowsHistoryEdits) return
+        if (!canPrune(ctx)) return
         if (estimateTokens(ctx) < window * pruneThreshold) return
         prune(ctx)
     }
 
-    /** El `usage` de la última respuesta como medida real; sin él (sesión nueva o recién compactada), caracteres/4. */
+    /**
+     * Podar reescribe mensajes ya enviados, y eso rompe el prefijo cacheado desde ahí (ADR 0006). Con un
+     * proveedor que cachea sale más caro podar que dejar el historial largo: solo se compacta.
+     */
+    private fun canPrune(ctx: AgentContext): Boolean =
+        ctx.provider.capabilities.allowsHistoryEdits && !ctx.provider.capabilities.promptCaching
+
+    /**
+     * El `usage` de la última respuesta como medida real; sin él (sesión nueva o recién compactada), caracteres/4.
+     * Cuenta `total`, que incluye lo servido de caché: si solo se mirara `inputTokens`, con caching el
+     * contexto parecería diminuto y no se compactaría nunca.
+     */
     fun estimateTokens(ctx: AgentContext): Int {
         val last = ctx.lastUsage ?: return rawEstimate(ctx)
         val sinceLast = ctx.messages.takeLastWhile { it.role == Role.USER }
-        return last.inputTokens + last.outputTokens + sinceLast.sumOf { charCount(it) / 4 }
+        return last.total + sinceLast.sumOf { charCount(it) / 4 }
     }
 
     /** Solo caracteres. Para contar la reducción de una compactación hay que medir los dos lados con la misma vara. */

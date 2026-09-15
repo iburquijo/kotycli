@@ -54,6 +54,33 @@ Ahí salieron los dos fallos que los tests no habían visto: un `describe()` que
 (`StackOverflowError`, el parámetro del constructor tapaba al método) y los números incomparables del evento
 `Compacted`. Los dos tienen ahora test.
 
+### Tramo 7 (contabilidad de la caché de prefijo)
+
+Capas 0 y 1 de lo hablado sobre prompt caching: **medir** y **no sabotear el prefijo**. La capa 2 —el
+adaptador `anthropic` nativo, que es el único que puede colocar `cache_control` explícitos— se queda fuera:
+es un tramo propio del roadmap y no hay clave de Anthropic para verificarlo. Construir un adaptador a ciegas
+es lo que nos dejó el ACP sin probar contra un cliente real.
+
+- **`Usage` separa lo cacheado**: `cacheReadTokens` y `cacheWriteTokens`, y `promptTokens` como suma.
+  `inputTokens` pasa a significar *solo lo procesado al precio completo*.
+- **Arreglado un bug latente en `ContextManager.estimateTokens`**, que usaba `inputTokens + outputTokens`.
+  En cuanto un proveedor cachee, ese campo es solo la cola no cacheada: un contexto de 90k habría parecido de
+  2k y no se habría compactado nunca, hasta reventar la ventana. Ahora cuenta `total`. Hay test.
+- **Con `promptCaching` no se poda.** Podar reescribe `ToolResult` ya enviados y tira el prefijo cacheado
+  (ADR 0006 ya lo decía). Nueva bandera `promptCaching` en `ProviderConfig`.
+- **`OpenAiWire.parseUsage` concilia las dos convenciones**: en el wire de OpenAI `prompt_tokens` incluye los
+  cacheados (`prompt_tokens_details.cached_tokens`) y se restan; en el de Anthropic `input_tokens` ya los
+  excluye y hay campos aparte. En los dos casos `promptTokens` vuelve a dar el prompt entero.
+- **Se pinta**: `— 12.0k tokens · caché 11.5k leídos · 90ms`. `/config` dice si el proveedor cachea y
+  `/reload` avisa de que cambiar el system prompt invalida la caché de la sesión.
+
+Decidido y no hecho: **no tocar la fecha del bloque de entorno del system prompt.** La checklist de caching
+dice que no metas fechas en el system prompt, pero aquí cambia una vez al día y dentro de una sesión es
+constante, así que moverla no compra nada. Además, cambiar cualquier cosa del `system` invalida esa caché
+entera: la posición dentro del bloque da igual.
+
+105 tests. Probado de punta a punta contra el servidor falso reportando `cached_tokens`.
+
 ### Tramo 6 (primera corrida real: OpenRouter + TUI en terminal de verdad)
 
 Carpeta `demo/`, con su propio README. kotycli manejado por `nvidia/nemotron-3.5-lightning:free` a

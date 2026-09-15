@@ -5,6 +5,7 @@ import com.softbenur.kotycli.core.AgentEvent
 import com.softbenur.kotycli.core.CompactResult
 import com.softbenur.kotycli.core.PermissionMode
 import com.softbenur.kotycli.core.PermissionReply
+import com.softbenur.kotycli.core.Usage
 import com.softbenur.kotycli.core.runLoop
 import com.softbenur.kotycli.skills.SkillCatalog
 import kotlinx.coroutines.Job
@@ -51,6 +52,18 @@ object Render {
     }
 
     fun tokens(n: Int): String = if (n >= 1000) String.format("%.1fk", n / 1000.0) else n.toString()
+
+    /**
+     * Lo que la caché de prefijo ha ahorrado en este turn, vacío si el proveedor no cachea. Se pinta porque
+     * el fallo del caching es silencioso: todo sigue funcionando y solo sube la factura.
+     */
+    fun cacheNote(usage: Usage): String {
+        val parts = buildList {
+            if (usage.cacheReadTokens > 0) add("${tokens(usage.cacheReadTokens)} leídos")
+            if (usage.cacheWriteTokens > 0) add("${tokens(usage.cacheWriteTokens)} escritos")
+        }
+        return if (parts.isEmpty()) "" else " · caché ${parts.joinToString(" + ")}"
+    }
 
     fun formatMs(ms: Long): String = if (ms >= 1000) String.format("%.1fs", ms / 1000.0) else "${ms}ms"
 
