@@ -37,7 +37,8 @@ data class AgentConfig(
  * que comparte `budget`, `events`, `interceptors` y `env` con el padre.
  */
 class AgentContext(
-    val config: AgentConfig,
+    /** `var` porque `/reload` cambia el system prompt y el modo de permisos sin tocar el historial. */
+    var config: AgentConfig,
     val provider: Provider,
     val tools: ToolRegistry,
     val interceptors: List<ToolInterceptor>,
@@ -73,6 +74,11 @@ class AgentContext(
         tokensBurned += usage.total
         lastUsage = usage
         budget.consume(usage)
+    }
+
+    /** Tras compactar, el `usage` de la última respuesta ya no mide este historial: solo vale la estimación. */
+    fun forgetUsage() {
+        lastUsage = null
     }
 
     /** Texto del último mensaje del asistente, lo único que un subagente devuelve al padre. */

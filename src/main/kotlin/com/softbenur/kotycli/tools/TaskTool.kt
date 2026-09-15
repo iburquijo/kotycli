@@ -28,9 +28,9 @@ data class TaskInput(
  * Comparte presupuesto, eventos, interceptores y `ToolEnv` con el padre; el historial no.
  */
 class TaskTool(
-    private val types: Map<String, AgentType>,
+    types: Map<String, AgentType>,
     /** Entorno y `AGENTS.md`: lo que el hijo necesita saber aunque no herede el prompt del padre. */
-    private val contextPrompt: String = "",
+    contextPrompt: String = "",
     /** Modelo por defecto de los subagentes (`subagentModel` en la config). */
     private val defaultModel: String? = null,
 ) : TypedTool<TaskInput>(TaskInput.serializer()) {
@@ -40,7 +40,20 @@ class TaskTool(
     override val parallel = true
     override val timeout: Duration = 30.minutes
 
-    override val description: String = """
+    @Volatile
+    private var types: Map<String, AgentType> = types
+
+    @Volatile
+    private var contextPrompt: String = contextPrompt
+
+    /** `/reload`: roles y `AGENTS.md` releídos del disco a mitad de sesión. */
+    fun reload(types: Map<String, AgentType>, contextPrompt: String) {
+        this.types = types
+        this.contextPrompt = contextPrompt
+    }
+
+    // Getter, no val: la lista de roles la ve el modelo en cada petición y `/reload` puede haberla cambiado.
+    override val description: String get() = """
         Lanza un subagente con contexto propio y te devuelve solo su respuesta final.
         Úsalo cuando la tarea vaya a generar mucho ruido que no necesitas conservar (búsquedas amplias,
         exploración de un repo grande) o cuando puedas lanzar varias tareas independientes a la vez.

@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
+import com.softbenur.kotycli.agents.AgentType
 import com.softbenur.kotycli.agents.AgentTypeLoader
 import com.softbenur.kotycli.config.Config
 import com.softbenur.kotycli.config.ConfigFile
@@ -18,6 +19,7 @@ import com.softbenur.kotycli.core.AgentContext
 import com.softbenur.kotycli.core.Budget
 import com.softbenur.kotycli.core.PermissionMode
 import com.softbenur.kotycli.frontend.LoopSession
+import com.softbenur.kotycli.frontend.Reload
 import com.softbenur.kotycli.frontend.Session
 import com.softbenur.kotycli.frontend.plain.Plain
 import com.softbenur.kotycli.frontend.tui.Tui
@@ -30,6 +32,7 @@ import com.softbenur.kotycli.interceptors.ToolLog
 import com.softbenur.kotycli.interceptors.Truncate
 import com.softbenur.kotycli.prompt.SystemPrompt
 import com.softbenur.kotycli.providers.Providers
+import com.softbenur.kotycli.skills.SkillCatalog
 import com.softbenur.kotycli.skills.SkillLoader
 import com.softbenur.kotycli.tools.BashTool
 import com.softbenur.kotycli.tools.CreateTool
@@ -125,29 +128,35 @@ class CommonOptions : CliktCommand(name = "kotycli") {
             http = truststore?.let { HttpConfig(truststore = it) },
             maxTokensPerSession = maxTokens?.toInt(),
         )
-        val config = Config.load(dirs, overrides)
-        return Bootstrap(config, workDir, allowPath.map { Path.of(it).toAbsolutePath().normalize() })
+        return Bootstrap({ Config.load(dirs, overrides) }, workDir, allowPath.map { Path.of(it).toAbsolutePath().normalize() })
     }
 }
 
-class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Path>) {
+/** Monta la sesión y se queda con lo que `/config` enseña y `/reload` vuelve a leer. */
+class Bootstrap(private val loadConfig: () -> Config, val workDir: Path, val allowedPaths: List<Path>) {
+    var config: Config = loadConfig()
+        private set
     val shell = Shell.detect()
     val httpAndReport = Http.build(config.http)
     val http get() = httpAndReport.first
+
+    private lateinit var policy: RulePolicy
+    private lateinit var taskTool: TaskTool
+    private var skills = SkillCatalog(emptyList())
+    private var agentTypes: Map<String, AgentType> = emptyMap()
 
     fun banner(): String = "kotycli · ${config.providerName}/${config.model} · ${config.file.permissionMode ?: "default"} · ${shell.displayName} · $workDir"
 
     fun session(): Session {
         val provider = Providers.build(config.providerName, config.provider, http)
         val env = ToolEnv(workDir = workDir, http = http, shell = shell, allowedPaths = allowedPaths)
-        val agentTypes = AgentTypeLoader.load(config.dirs)
-        val skills = SkillLoader.load(config.dirs, workDir)
-        val contextPrompt = SystemPrompt.context(config.dirs, shell, workDir, skills)
+        agentTypes = AgentTypeLoader.load(config.dirs)
+        skills = SkillLoader.load(config.dirs, workDir)
+        taskTool = TaskTool(agentTypes, SystemPrompt.context(config.dirs, shell, workDir, skills), config.file.subagentModel)
         val tools = ToolRegistry(listOf(
-            BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool(), FetchTool(),
-            TaskTool(agentTypes, contextPrompt, config.file.subagentModel),
+            BashTool(shell, workDir), ReadTool(), EditTool(), CreateTool(), FetchTool(), taskTool,
         ))
-        val policy = RulePolicy(config.settings.rules())
+        policy = RulePolicy(config.settings.rules())
         val interceptors = listOf(PathGuard(), Permissions(policy), ToolLog(config.dirs.logsDir.resolve("tools.jsonl")), Truncate())
         val agentConfig = AgentConfig(
             systemPrompt = SystemPrompt.build(config.dirs, shell, workDir, skills),
@@ -157,8 +166,52 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
             permissionMode = config.file.permissionMode?.let { PermissionMode.parse(it) } ?: PermissionMode.DEFAULT,
         )
         val root = AgentContext(agentConfig, provider, tools, interceptors, Budget(config.file.maxTokensPerSession), env)
-        return LoopSession(root, skills)
+        return LoopSession(root, skills, describer = ::describe, reloader = ::reload)
     }
+
+    /** `/config`: lo que está en vigor de verdad, no lo que pone un fichero suelto. */
+    private fun describe(): String {
+        val report = httpAndReport.second
+        return listOf(
+            "directorio" to workDir.toString(),
+            "config" to config.sources.joinToString(", ").ifEmpty { "(ninguna; valores por defecto)" },
+            "proveedor" to "${config.providerName} (${config.provider.type}) · ${config.provider.baseUrl ?: "sin baseUrl"}",
+            "modelo" to runCatching { config.model }.getOrDefault("(sin configurar)") +
+                (config.file.subagentModel?.let { " · subagentes $it" } ?: ""),
+            "contexto" to "${config.provider.contextWindow} tokens · salida ${config.provider.maxOutputTokens}",
+            "permisos" to "${config.file.permissionMode ?: "default"} · ${policy.rules().size} reglas",
+            "truststore" to report.trustSources.joinToString(" + "),
+            "proxy" to report.proxyDescription,
+            "shell" to shell.displayName,
+            "skills" to skills.names().joinToString().ifEmpty { "(ninguno)" },
+            "roles" to agentTypes.keys.joinToString(),
+        ).joinToString("\n") { (key, value) -> key.padEnd(13) + value }
+    }
+
+    /**
+     * `/reload`: config, `AGENTS.md`, skills y roles vuelven del disco. El proveedor y el modelo no cambian:
+     * el historial ya enviado va atado a ellos (ADR 0006) y rehacerlo a mitad de conversación es otro tramo.
+     */
+    private fun reload(): Reload {
+        val previousModel = runCatching { config.model }.getOrNull()
+        config = loadConfig()
+        skills = SkillLoader.load(config.dirs, workDir)
+        agentTypes = AgentTypeLoader.load(config.dirs)
+        taskTool.reload(agentTypes, SystemPrompt.context(config.dirs, shell, workDir, skills))
+        policy.replaceConfigRules(config.settings.rules())
+        val mode = config.file.permissionMode?.let { PermissionMode.parse(it) } ?: PermissionMode.DEFAULT
+        val newModel = runCatching { config.model }.getOrNull()
+        val warning = if (newModel != previousModel) " El modelo pasa a ser $newModel al reiniciar; esta sesión sigue con $previousModel." else ""
+        return Reload(
+            skills = skills,
+            systemPrompt = SystemPrompt.build(config.dirs, shell, workDir, skills),
+            permissionMode = mode,
+            summary = "Recargado: ${plural(skills.all.size, "skill")}, ${plural(agentTypes.size, "rol", "roles")}, " +
+                "${plural(policy.rules().size, "regla")} de permisos, modo ${mode.cli}.$warning",
+        )
+    }
+
+    private fun plural(n: Int, singular: String, plural: String = "${singular}s") = "$n ${if (n == 1) singular else plural}"
 }
 
 class Doctor : CliktCommand(name = "doctor") {

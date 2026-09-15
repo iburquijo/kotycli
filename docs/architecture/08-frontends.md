@@ -26,14 +26,35 @@ Comandos `/`:
 
 | Comando | Qué hace |
 |---------|----------|
-| `/compact` | Resume la conversación y libera contexto |
-| `/config` | Ver y cambiar proveedor, modelo y modo de permisos en caliente |
+| `/help` | Lista los comandos y los skills |
+| `/compact [foco]` | Resume la conversación y libera contexto. El texto extra es una instrucción para el resumen |
+| `/config` | Enseña la configuración en vigor y de qué ficheros sale |
 | `/copy` | Copia la última respuesta al portapapeles |
-| `/edit` | Vuelca el transcript a un fichero temporal y abre `$EDITOR`. Navegar con Emacs de verdad, gratis |
-| `/reload` | Reescanea skills y agentes |
+| `/edit [texto]` | Escribe el mensaje en `$EDITOR` en vez de en una línea del terminal |
+| `/reload` | Relee config, `AGENTS.md`, skills y roles sin perder el historial |
+| `/exit` | Salir |
 | `/<skill>` | Invoca un skill con argumentos |
 
-Fase 1: completado clásico con Tab de JLine. El panel flotante filtrado en vivo bajo el prompt llega después: es puro chrome sobre el mismo completer.
+Los builtin ganan a un skill que se llame igual: instalar un skill llamado `exit` no puede dejar al usuario
+sin forma de salir. Un `/loquesea` que no es ninguna de las dos cosas se avisa, no se le manda al modelo.
+
+`Commands.parse` (en `frontend/`) interpreta la línea y devuelve un `Command`; la TUI y `--plain` deciden qué
+saben hacer con cada caso. Es lo mismo que ya pasaba con `SkillCatalog.expand`, extendido a los builtin.
+
+Detalles de los tres que tocan el sistema:
+
+- `/copy` prueba primero el comando del sistema (`wl-copy`, `xclip`, `xsel`, `pbcopy`, `clip`) y si no hay
+  ninguno cae a OSC 52, que hace que copie el emulador de terminal: así funciona también al otro lado de un ssh.
+  Nada de AWT, que sin display se cuelga o revienta.
+- `/edit` abre `$VISUAL` (o `$EDITOR`, o `vi`/`notepad`) sobre un temporal con `inheritIO`, y manda lo que
+  haya al guardar. Vacío no manda nada. En `--plain` pide TTY.
+- `/reload` no cambia el proveedor ni el modelo: el historial ya enviado va atado a ellos (ADR 0006) y
+  rehacerlo a mitad de conversación es otro tramo. Se lo dice al usuario si el fichero los ha cambiado.
+  Las reglas de permisos de los ficheros se sustituyen; las de "siempre en esta sesión" se conservan.
+
+Fase 1: completado clásico con Tab de JLine, con los candidatos recalculados en cada Tab porque `/reload`
+puede haber cambiado la lista de skills. El panel flotante filtrado en vivo bajo el prompt llega después: es
+puro chrome sobre el mismo completer.
 
 Pager (opcional, después): con `Esc` se entra al alternate buffer y se navega el transcript con teclas vim (`j/k`, `^d/^u`, `gg/G`, `/`, `q`). Solo repinta al pulsar tecla, cero coste durante el streaming. `/edit` es el atajo previo y más barato.
 
@@ -92,5 +113,6 @@ Reglas duras:
 ## Lo que ningún frontend hace
 
 - No decide permisos: pinta la pregunta y devuelve la respuesta.
-- No toca el historial: `/compact` es un comando al core, no una manipulación local.
-- No conoce proveedores: `/config` cambia configuración y el core reconstruye el `Provider`.
+- No toca el historial: `/compact` es un comando al core (`ContextManager.compact`), no una manipulación local.
+- No conoce proveedores: `/config` solo enseña lo que hay. Cambiar proveedor o modelo en caliente obligaría a
+  reconstruir el `Provider` y a decidir qué pasa con el historial que ya viajó; hoy eso pide reiniciar.
