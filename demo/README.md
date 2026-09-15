@@ -4,7 +4,7 @@ Prueba de kotycli con un proveedor de verdad (OpenRouter, `nvidia/nemotron-3.5-l
 encargándole un proyecto de ETL con arquitectura medallion en PySpark local.
 
 Doble objetivo: **tener el proyecto** y, sobre todo, **ver qué se rompe en kotycli** cuando lo maneja
-un modelo real en un terminal real. Se rompieron dos cosas; las dos están arregladas y con test.
+un modelo real en un terminal real. Se rompieron dos cosas y una tercera molestaba; las tres están arregladas.
 
 ## El token
 
@@ -94,7 +94,7 @@ al `left_semi` ya no queda ninguno. Es un defecto del generador —la suciedad d
 ve solo porque el informe cuenta paso a paso en vez de dar un total. Verificado a mano: tras silver no
 quedan huérfanos, ni duplicados, ni cantidades malas.
 
-## Los dos fallos de kotycli que salieron
+## Lo que salió y se arregló
 
 ### 1. La TUI se comía los acentos si el locale no es UTF-8
 
@@ -107,6 +107,11 @@ JLine**, y desde JLine 3.25 ese writer usa `stdoutEncoding`, un ajuste distinto 
 el charset interno del terminal, no el del writer).
 
 Arreglado en `Tui.terminalBuilder()`, con test en `TerminalEncodingTest`.
+
+### 3. El prompt no decía dónde estabas
+
+Era un `>` pelado, indistinguible del prompt del shell. Ahora es `kotycli >`, con el nombre en cian en
+la TUI y en texto pelado en `--plain`, que no usa ANSI por definición.
 
 ![TUI en terminal real](screenshots/01-tui-comandos.png)
 
@@ -162,7 +167,9 @@ Transcripciones completas en `logs/`, una por tanda:
 | `02-bronze.log` | Capa bronze | OK, 128k tokens, 607 s |
 | `03-silver.log` | Capa silver (1er intento) | El modelo no contestó: 5.9k tokens, 69 s |
 | `03b-silver.log` | Capa silver (2º intento) | OK, pero acabó en 429 |
-| `tui-help-config.ansi` | Captura ANSI de la TUI | Origen del pantallazo 01 |
+| `tui-prompt.ansi` | Captura ANSI de la TUI | Origen del pantallazo 01 |
 
-Las capturas ANSI se tomaron alimentando el PTY por tubería, así que el eco de lo tecleado aparece
-donde no lo pondría una persona escribiendo en vivo.
+Las capturas de la TUI se toman con `capture.sh`, que abre un PTY de verdad con `script`. El `stty`
+que hay dentro no es decorativo: el PTY que abre `script` no tiene tamaño, y sin tamaño **JLine trunca
+el prompt y lo rellena con puntos**. Costó un rato entender que ese `>....` era el montaje de captura
+y no kotycli.

@@ -8,7 +8,9 @@ El transcript fluye hacia arriba como un log. Solo la zona del prompt y una lín
 
 ## TUI (por defecto)
 
-Terminal nativo con JLine para el prompt, el historial y el completado.
+Terminal nativo con JLine para el prompt, el historial y el completado. El prompt es `kotycli > ` (el
+nombre en cian): un `>` pelado no se distingue del prompt del shell, y en un transcript append-only, que
+es un log corrido, eso importa. En `--plain` va el mismo texto sin ANSI.
 
 Cómo se pinta cada evento:
 

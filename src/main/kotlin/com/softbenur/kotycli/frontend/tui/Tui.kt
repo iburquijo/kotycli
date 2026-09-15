@@ -42,13 +42,21 @@ class Tui(private val session: Session, private val banner: String) {
     private val reader: LineReader = LineReaderBuilder.builder().terminal(terminal).completer(completer).build()
     private val out get() = terminal.writer()
 
+    /** El transcript es un log corrido: sin el nombre delante, el prompt se confunde con el del shell. */
+    private val prompt: String = AttributedStringBuilder()
+        .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN))
+        .append("\nkotycli")
+        .style(AttributedStyle.DEFAULT)
+        .append(" > ")
+        .toAnsi(terminal)
+
     suspend fun run() = coroutineScope {
         val printer = subscribe(this)
         styled(banner, AttributedStyle.DEFAULT.faint())
         styled("Escribe un mensaje y Enter. Ctrl+C cancela el turn en curso; /help lista los comandos.", AttributedStyle.DEFAULT.faint())
         while (true) {
             val line = try {
-                withContext(Dispatchers.IO) { reader.readLine("\n> ") }
+                withContext(Dispatchers.IO) { reader.readLine(prompt) }
             } catch (e: UserInterruptException) {
                 continue
             } catch (e: EndOfFileException) {

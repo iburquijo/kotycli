@@ -24,10 +24,7 @@ def clean(raw: str) -> str:
     text = OSC.sub("", text)
     text = NON_SGR.sub("", text)
     text = OTHER_ESC.sub("", text)
-    # Al alimentar el PTY por tubería, JLine no puede hacer eco real de lo tecleado y deja puntos
-    # tras el prompt. Es un artefacto del montaje de captura, no algo que vea un usuario.
-    text = re.sub(r"(?m)^> \.{2,}", "> ", text.replace("\r\n", "\n").replace("\r", ""))
-    return re.sub(r"(?m)^>\.{2,}", "> ", text)
+    return text.replace("\r\n", "\n").replace("\r", "")
 
 
 def main(src: Path, dst: Path, title: str) -> None:

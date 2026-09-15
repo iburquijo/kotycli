@@ -43,7 +43,7 @@ class Plain(
         val printer = subscribe(this)
         out.println("kotycli (--plain). Escribe un mensaje y Enter; /help lista los comandos.")
         while (true) {
-            out.print("> ")
+            out.print("kotycli > ") // sin ANSI: en `--plain` el prompt también es texto pelado
             out.flush()
             val line = withContext(Dispatchers.IO) { input.readLine() } ?: break
             if (line.isBlank()) continue
