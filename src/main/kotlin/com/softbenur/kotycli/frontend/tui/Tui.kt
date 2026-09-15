@@ -37,7 +37,7 @@ import org.jline.utils.AttributedStyle
  * Nunca pantalla completa, nunca framework de repintado.
  */
 class Tui(private val session: Session, private val banner: String) {
-    private val terminal: Terminal = TerminalBuilder.builder().system(true).encoding(Charsets.UTF_8).build()
+    private val terminal: Terminal = buildTerminal()
     private val completer = SessionCompleter { Commands.builtins + session.skills.names().map { "/$it" } }
     private val reader: LineReader = LineReaderBuilder.builder().terminal(terminal).completer(completer).build()
     private val out get() = terminal.writer()
@@ -166,6 +166,21 @@ class Tui(private val session: Session, private val banner: String) {
         out.flush()
     }
 }
+
+/**
+ * JLine 3.25 separó el charset interno del terminal (`encoding`) del que usa el writer
+ * (`stdoutEncoding`), y este último lo deduce de `stdout.encoding`/`native.encoding`. Sin `LANG` UTF-8
+ * —Windows, `docker run` pelado, `systemd`— salen `ANSI_X3.4-1968` y los acentos y los `·` se van a `?`.
+ * `Main.ensureUtf8Stdout()` no llega aquí: la TUI no escribe por `System.out` sino por `terminal.writer()`.
+ */
+fun terminalBuilder(): TerminalBuilder = TerminalBuilder.builder()
+    .system(true)
+    .encoding(Charsets.UTF_8)
+    .stdinEncoding(Charsets.UTF_8)
+    .stdoutEncoding(Charsets.UTF_8)
+    .stderrEncoding(Charsets.UTF_8)
+
+fun buildTerminal(): Terminal = terminalBuilder().build()
 
 /** Los candidatos se recalculan en cada TAB porque `/reload` puede haber cambiado la lista de skills. */
 private class SessionCompleter(private val candidates: () -> List<String>) : Completer {
