@@ -19,6 +19,8 @@ sealed interface AgentEvent {
     data class ToolEnd(override val agentId: String, val call: Block.ToolUse, val result: Block.ToolResult, val durationMs: Long) : AgentEvent
     data class PermissionAsk(
         override val agentId: String,
+        /** Id de la tool call que espera permiso: ACP lo necesita para correlacionarla con su `tool_call`. */
+        val callId: String,
         val toolName: String,
         val input: JsonObject,
         val subject: String,

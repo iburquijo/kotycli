@@ -17,7 +17,7 @@ import com.softbenur.kotycli.core.AgentConfig
 import com.softbenur.kotycli.core.AgentContext
 import com.softbenur.kotycli.core.Budget
 import com.softbenur.kotycli.core.PermissionMode
-import com.softbenur.kotycli.core.runLoop
+import com.softbenur.kotycli.frontend.LoopSession
 import com.softbenur.kotycli.frontend.Session
 import com.softbenur.kotycli.frontend.plain.Plain
 import com.softbenur.kotycli.frontend.tui.Tui
@@ -40,14 +40,19 @@ import com.softbenur.kotycli.tools.Shell
 import com.softbenur.kotycli.tools.TaskTool
 import com.softbenur.kotycli.tools.ToolEnv
 import com.softbenur.kotycli.tools.ToolRegistry
-import kotlinx.coroutines.Job
+import com.softbenur.kotycli.frontend.acp.Acp
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.io.FileDescriptor
+import java.io.FileOutputStream
+import java.io.OutputStreamWriter
 import java.net.URI
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.time.LocalDateTime
 import kotlin.system.exitProcess
 
 /** Todo lo que hace falta para montar una sesión, compartido por `kotycli` y `kotycli doctor`. */
@@ -59,6 +64,7 @@ class CommonOptions : CliktCommand(name = "kotycli") {
 
     val prompt by argument(help = "Prompt inicial. En --plain ejecuta un solo turn y sale").optional()
     val plain by option("--plain", help = "Sin ANSI ni raw mode: para comint, pipes y CI").flag()
+    val acp by option("--acp", help = "Frontend ACP (JSON-RPC por stdio) para Emacs, Zed o Neovim").flag()
     val provider by option("--provider", help = "Nombre del proveedor en la config (p.ej. local, corp)")
     val model by option("--model", help = "Modelo a usar")
     val mode by option("--mode", help = "Modo de permisos: default | accept-edits | yolo")
@@ -76,6 +82,7 @@ class CommonOptions : CliktCommand(name = "kotycli") {
             echo("kotycli: ${e.message}", err = true)
             exitProcess(2)
         }
+        if (acp) { runAcp(boot); return }
         runBlocking {
             val session = boot.session()
             if (plain) {
@@ -89,8 +96,27 @@ class CommonOptions : CliktCommand(name = "kotycli") {
         }
     }
 
-    fun bootstrap(): Bootstrap {
-        val workDir = (cwd?.let { Path.of(it) } ?: Path.of("")).toAbsolutePath().normalize()
+    /**
+     * ACP por stdio (ADR 0010). stdout es del protocolo: se reserva el descriptor real y se manda a stderr
+     * cualquier `println` que se le escape a una librería, para que nunca corrompa el wire.
+     */
+    private fun runAcp(boot: Bootstrap) {
+        val protocol = OutputStreamWriter(FileOutputStream(FileDescriptor.out), Charsets.UTF_8)
+        System.setOut(java.io.PrintStream(FileOutputStream(FileDescriptor.err), true, Charsets.UTF_8))
+        val log = AcpLog(boot.config.dirs.logsDir.resolve("acp.log"))
+        runBlocking {
+            Acp(
+                open = { workDir -> bootstrap(workDir).session() },
+                input = System.`in`.bufferedReader(),
+                output = protocol,
+                defaultCwd = boot.workDir,
+                log = log::write,
+            ).run()
+        }
+    }
+
+    fun bootstrap(cwdOverride: Path? = null): Bootstrap {
+        val workDir = (cwdOverride ?: cwd?.let { Path.of(it) } ?: Path.of("")).toAbsolutePath().normalize()
         val dirs = Dirs(project = workDir)
         val overrides = ConfigFile(
             provider = provider,
@@ -131,17 +157,7 @@ class Bootstrap(val config: Config, val workDir: Path, val allowedPaths: List<Pa
             permissionMode = config.file.permissionMode?.let { PermissionMode.parse(it) } ?: PermissionMode.DEFAULT,
         )
         val root = AgentContext(agentConfig, provider, tools, interceptors, Budget(config.file.maxTokensPerSession), env)
-        return object : Session {
-            override val root = root
-            override val skills = skills
-            private var current: Job? = null
-            override suspend fun turn(prompt: String) = coroutineScope {
-                val job = launch { runLoop(root, prompt) }
-                current = job
-                job.join()
-            }
-            override fun cancel() { current?.cancel() }
-        }
+        return LoopSession(root, skills)
     }
 }
 
@@ -171,6 +187,18 @@ class Doctor : CliktCommand(name = "doctor") {
             var cause = e.cause
             while (cause != null) { echo("              causa: ${cause::class.simpleName}: ${cause.message}"); cause = cause.cause }
             exitProcess(1)
+        }
+    }
+}
+
+/** En ACP no se puede imprimir nada: los errores de protocolo van a `~/.kotycli/logs/acp.log`. */
+class AcpLog(private val path: Path) {
+    fun write(line: String) {
+        try {
+            Files.createDirectories(path.parent)
+            Files.writeString(path, "${LocalDateTime.now()} $line\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+        } catch (e: Exception) {
+            // Si ni siquiera se puede escribir el log, se traga: romper el protocolo sería peor.
         }
     }
 }

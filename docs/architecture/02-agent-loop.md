@@ -177,7 +177,7 @@ sealed interface AgentEvent {
     data class AssistantMessage(override val agentId: String, val message: Message) : AgentEvent
     data class ToolStart(override val agentId: String, val call: ToolUse) : AgentEvent
     data class ToolEnd(override val agentId: String, val call: ToolUse, val result: ToolResult, val durationMs: Long) : AgentEvent
-    data class PermissionAsk(override val agentId: String, val toolName: String, val input: JsonObject, val subject: String, val reply: CompletableDeferred<PermissionReply>) : AgentEvent
+    data class PermissionAsk(override val agentId: String, val callId: String, val toolName: String, val input: JsonObject, val subject: String, val reply: CompletableDeferred<PermissionReply>) : AgentEvent
     data class SubagentStart(override val agentId: String, val parentId: String, val agentType: String, val prompt: String) : AgentEvent
     data class SubagentEnd(override val agentId: String, val tokensBurned: Int, val tokensReturned: Int) : AgentEvent
     data class Compacted(override val agentId: String, val before: Int, val after: Int) : AgentEvent
@@ -192,7 +192,7 @@ sealed interface AgentEvent {
 
 `Failed` y `TurnEnd` no estaban en el borrador: un error de proveedor no puede ser una excepción que tumbe el frontend, y el separador de fin de turn necesita saber cuándo acaba el turn sin que el frontend inspeccione el historial.
 
-`PermissionAsk` lleva un `CompletableDeferred`: el frontend lo completa cuando el usuario responde. En `--plain` sin TTY o sin frontend suscrito, se completa con `Deny` tras el timeout.
+`PermissionAsk` lleva un `CompletableDeferred`: el frontend lo completa cuando el usuario responde. En `--plain` sin TTY o sin frontend suscrito, se completa con `Deny` tras el timeout. Lleva también el `callId` de la tool call que espera, que ACP necesita para correlacionar el permiso con su `tool_call`.
 
 ## Presupuestos
 

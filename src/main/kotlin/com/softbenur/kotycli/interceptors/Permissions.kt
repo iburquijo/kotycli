@@ -135,7 +135,7 @@ class Permissions(
         if (ctx.events.subscriptionCount.value == 0) return denied(call, "no hay nadie que pueda aprobar la operación")
         val subject = RulePolicy.subjectOf(tool, call.input)
         val reply = CompletableDeferred<PermissionReply>()
-        ctx.emit(AgentEvent.PermissionAsk(ctx.id, tool.name, call.input, subject, reply))
+        ctx.emit(AgentEvent.PermissionAsk(ctx.id, call.id, tool.name, call.input, subject, reply))
         val answer = withTimeoutOrNull(askTimeout) { reply.await() } ?: PermissionReply.DENY
         return when (answer) {
             PermissionReply.ALLOW -> null

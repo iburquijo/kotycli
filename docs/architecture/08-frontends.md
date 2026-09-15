@@ -47,25 +47,46 @@ Modo terminal tonto: sin ANSI, sin raw mode, sin JLine. Lee líneas de stdin, es
 
 ## ACP (`--acp`)
 
-Agent Client Protocol: JSON-RPC 2.0 sobre stdin/stdout. Los clientes ya existen y los mantienen otros: agent-shell y agent-ide en Emacs, Zed, Neovim. Nosotros implementamos solo el lado agente, unos cientos de líneas de Kotlin sobre eventos que ya existen.
+Agent Client Protocol: JSON-RPC 2.0 sobre stdin/stdout, **un mensaje JSON por línea** (sin cabeceras
+`Content-Length`). Los clientes ya existen y los mantienen otros: agent-shell y agent-ide en Emacs, Zed,
+Neovim. Nosotros implementamos solo el lado agente, unos cientos de líneas de Kotlin sobre eventos que ya existen.
 
 Mapeo:
 
 | Nuestro | ACP |
 |---------|-----|
-| Arranque | `initialize` (capacidades: prompt de texto, permisos) |
-| Nueva conversación | `session/new` -> `AgentContext` raíz |
+| Arranque | `initialize` (versión negociada a la baja; sin `loadSession`, sin métodos de autenticación) |
+| Nueva conversación | `session/new` -> un `Bootstrap` con el `cwd` que pida el cliente -> `AgentContext` raíz |
+| Lista de skills | `session/update` con `available_commands_update` justo después de `session/new` |
 | Prompt del usuario | `session/prompt` -> `runLoop`; la respuesta llega cuando termina el turn con `stopReason` |
 | `TextDelta` | `session/update` con `agent_message_chunk` |
-| `ToolStart` / `ToolEnd` | `session/update` con `tool_call` y `tool_call_update` (estado, título, salida resumida) |
-| `PermissionAsk` | `session/request_permission` con opciones allow once / allow always / reject; la respuesta completa el `CompletableDeferred` |
-| Ctrl+C del cliente | `session/cancel` -> cancelación del `Job` |
-| `SubagentStart` / hijo | `session/update` etiquetado; el cliente decide si agrupa |
+| `ToolStart` / `ToolEnd` | `session/update` con `tool_call` y `tool_call_update` (estado, título, salida) |
+| `PermissionAsk` | `session/request_permission` con allow once / allow always / reject once |
+| `session/cancel` del cliente | cancelación del `Job` del turn; el `session/prompt` pendiente responde `cancelled` |
+| `SubagentStart` / eventos del hijo | `session/update` con `agent_thought_chunk`: ACP no modela subagentes y el cliente decide si los agrupa |
+
+Detalles del mapeo que no son obvios:
+
+- El `kind` de la tool call sale del nombre: `bash` es `execute`, `read` es `read`, `edit` y `create` son
+  `edit`, `fetch` es `fetch`, el resto `other`. Un `edit` o un `create` llevan además el `diff`, para que el
+  cliente lo enseñe **antes** de que el usuario dé permiso, y `locations` con la ruta absoluta.
+- Una tool call que espera permiso se anuncia primero como `tool_call` en estado `pending`; el `ToolStart`
+  posterior solo manda el cambio a `in_progress`. Si el permiso se deniega no hay `ToolStart` ni `ToolEnd`,
+  así que el propio `Deny` cierra la llamada como `failed`.
+- `stopReason`: `end_turn`, `cancelled`, `refusal` con un `Refusal`, y `max_tokens` o `max_turn_requests`
+  según de qué sea el `BudgetExceeded`. Un `Failed` (error del proveedor) no es un turn que acaba bien: se
+  devuelve como error JSON-RPC.
+- La respuesta a `session/prompt` espera a que la bomba de eventos haya procesado el `TurnEnd`, para que
+  ningún `session/update` llegue después de la respuesta que lo cierra.
 
 Reglas duras:
 
-- **stdout es del protocolo.** Ni un `println` en todo el proceso. Logs a fichero, siempre.
-- Los `Ask` sin respuesta del cliente en un tiempo razonable se resuelven como `Deny`.
+- **stdout es del protocolo.** Ni un `println` en todo el proceso: `--acp` se queda con el descriptor real de
+  stdout y redirige `System.out` a stderr, por si a alguna librería se le escapa uno. Los errores de protocolo
+  van a `~/.kotycli/logs/acp.log`. `ArchitectureTest` vigila que en `frontend/acp/` no haya `println`.
+- Los `Ask` sin respuesta del cliente en un tiempo razonable (5 min) se resuelven como `Deny`.
+- Cada petición entrante se atiende en su propia corrutina: un `session/prompt` de diez minutos no puede tapar
+  el `session/cancel` que viene detrás.
 - El `Flow<AgentEvent>` es el mismo objeto que consume la TUI; ACP es otro suscriptor.
 
 ## Lo que ningún frontend hace
