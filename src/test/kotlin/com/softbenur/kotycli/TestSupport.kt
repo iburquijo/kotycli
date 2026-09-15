@@ -6,6 +6,7 @@ import com.softbenur.kotycli.core.AgentEvent
 import com.softbenur.kotycli.core.Block
 import com.softbenur.kotycli.core.Budget
 import com.softbenur.kotycli.core.Completion
+import com.softbenur.kotycli.core.ContextManager
 import com.softbenur.kotycli.core.Message
 import com.softbenur.kotycli.core.PermissionMode
 import com.softbenur.kotycli.core.Role
@@ -93,6 +94,7 @@ fun testContext(
     budget: Budget = Budget(),
     depth: Int = 0,
     http: java.net.http.HttpClient? = null,
+    contextManager: ContextManager = ContextManager(),
 ): AgentContext = AgentContext(
     config = AgentConfig(systemPrompt = "test", model = "m", maxIterationsPerTurn = maxIterations, permissionMode = mode),
     provider = provider,
@@ -100,6 +102,7 @@ fun testContext(
     interceptors = interceptors,
     budget = budget,
     env = ToolEnv(workDir = workDir.toRealPath(), shell = Shell.detect(), http = http),
+    contextManager = contextManager,
     depth = depth,
 )
 

@@ -74,15 +74,21 @@ interface PermissionPolicy {
  * ("permitir siempre en esta sesión") se añaden en caliente.
  */
 class RulePolicy(rules: List<Rule> = emptyList()) : PermissionPolicy {
-    private val rules = CopyOnWriteArrayList(rules)
+    @Volatile
+    private var configRules: List<Rule> = rules
+    private val sessionRules = CopyOnWriteArrayList<Rule>()
     private val agentRules = ConcurrentHashMap<List<String>, List<Rule>>()
 
-    fun addSessionRule(rule: Rule) { rules += rule }
-    fun rules(): List<Rule> = rules.toList()
+    fun addSessionRule(rule: Rule) { sessionRules += rule }
+
+    /** `/reload`: las reglas de los ficheros se sustituyen; las de "siempre en esta sesión" se conservan. */
+    fun replaceConfigRules(rules: List<Rule>) { configRules = rules }
+
+    fun rules(): List<Rule> = configRules + sessionRules
 
     override fun decide(ctx: AgentContext, tool: Tool, input: JsonObject): Decision {
         val subject = subjectOf(tool, input)
-        val matching = (rules + rulesOf(ctx)).filter { it.matches(tool.name, subject) }
+        val matching = (rules() + rulesOf(ctx)).filter { it.matches(tool.name, subject) }
         matching.firstOrNull { it.decision == Rule.Kind.DENY }?.let { return Decision.Deny("regla ${it}") }
         if (matching.any { it.decision == Rule.Kind.ALLOW }) return Decision.Allow
         if (matching.any { it.decision == Rule.Kind.ASK }) return Decision.Ask

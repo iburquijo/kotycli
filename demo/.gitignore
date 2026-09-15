@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+lake/
+.ipynb_checkpoints/
+
+# Las transcripciones del agente SÍ van al repo: son parte de lo que documenta esta demo,
+# y el .gitignore de la raíz las tapa con su regla `*.log`.
+!logs/*.log
