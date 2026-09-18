@@ -1,0 +1,5 @@
+● read  /home/user/kotycli/demo/medallion
+● read  /home/user/kotycli/demo/medallion/jobs/bronze.py
+  └ ✗ /home/user/kotycli/demo/medallion es un directorio. Usa `bash ls` para listarlo (13ms)
+  └ 1	"""Capa BRONCE del pipeline medallion. … (46 líneas) (13ms)
+— 5.9k tokens · 69.0s

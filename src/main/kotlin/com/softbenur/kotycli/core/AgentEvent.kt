@@ -34,5 +34,14 @@ sealed interface AgentEvent {
     data class Refusal(override val agentId: String) : AgentEvent
     /** El proveedor falló (red, 4xx/5xx, wire ilegible). El turn termina; el historial queda como estaba. */
     data class Failed(override val agentId: String, val message: String) : AgentEvent
-    data class TurnEnd(override val agentId: String, val usage: Usage, val durationMs: Long) : AgentEvent
+    /**
+     * `answered` es false cuando el turn termina sin que el modelo haya escrito ni una palabra (típico de
+     * modelos pequeños tras una ronda de tools). Sin esto el frontend no pinta nada y parece que no ha pasado nada.
+     */
+    data class TurnEnd(
+        override val agentId: String,
+        val usage: Usage,
+        val durationMs: Long,
+        val answered: Boolean = true,
+    ) : AgentEvent
 }

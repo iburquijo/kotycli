@@ -102,4 +102,28 @@ class RunLoopTest {
         val results = dispatch(ctx, calls)
         assertEquals(listOf("a", "b", "c"), results.map { it.toolUseId })
     }
+
+    /**
+     * Pasó con un modelo pequeño de verdad: llamó a dos tools y cerró el turn sin escribir nada.
+     * El frontend no pintaba nada y parecía que kotycli se había colgado.
+     */
+    @Test
+    fun `un turn que acaba sin texto se marca como no contestado`() = runTest {
+        val mudo = FakeProvider(mutableListOf(
+            FakeProvider.toolCall("c1", "echo", json("text" to "hola")),
+            FakeProvider.text(""),
+        ))
+        val ctx = testContext(mudo)
+        val (events, job) = collectEvents(ctx)
+        runLoop(ctx, "haz algo")
+        yield(); job.cancelAndJoin()
+        assertEquals(false, events.filterIsInstance<AgentEvent.TurnEnd>().single().answered)
+
+        val hablador = FakeProvider(mutableListOf(FakeProvider.text("ya está")))
+        val ctx2 = testContext(hablador)
+        val (events2, job2) = collectEvents(ctx2)
+        runLoop(ctx2, "haz algo")
+        yield(); job2.cancelAndJoin()
+        assertEquals(true, events2.filterIsInstance<AgentEvent.TurnEnd>().single().answered)
+    }
 }

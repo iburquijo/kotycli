@@ -16,6 +16,8 @@ data class ProviderConfig(
     val contextWindow: Int = 0,
     val parallelToolCalls: Boolean = true,
     val allowsHistoryEdits: Boolean = true,
+    /** El proveedor cachea el prefijo del prompt. Implica no podar: podar reescribiría ese prefijo. */
+    val promptCaching: Boolean = false,
     val maxOutputTokens: Int = 8192,
 )
 
